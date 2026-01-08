@@ -1,0 +1,213 @@
+@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --primary: #123859;
+  --accent: #f9941f;
+  --background: #f2f2f2;
+  --surface: #e5e5e5;
+
+  --text-on-light: #123859;
+  --text-on-dark: #ffffff;
+
+  --radius: 0.625rem;
+
+  --card: var(--surface);
+  --card-foreground: var(--text-on-light);
+
+  --input: #d1d1d1;
+
+  --sidebar: #e5e5e5;
+  --sidebar-foreground: var(--text-on-light);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--text-on-dark);
+  --sidebar-accent: var(--accent);
+  --sidebar-accent-foreground: var(--text-on-dark);
+  --sidebar-border: hsl(220 13% 91%);
+  --sidebar-ring: hsl(217.2 91.2% 59.8%);
+}
+
+/* ---------------------------
+   DARK MODE
+--------------------------- */
+.dark {
+  --primary: #D9961A;        /* cor principal no escuro */
+  --accent: #EEF5F5;         /* cor de destaque clara */
+  --background: #171717;     /* fundo escuro */
+  --surface: #2a2a2a;        /* superfície escura */
+
+  --text-on-light: #EEF5F5;  /* texto claro */
+  --text-on-dark: #171717;   /* texto escuro sobre fundo claro */
+
+  --card: #2a2a2a;
+  --card-foreground: #EEF5F5;
+
+  --input: #3a3a3a;
+
+  --sidebar: #1f1f1f;
+  --sidebar-foreground: #EEF5F5;
+  --sidebar-primary: #D9961A;
+  --sidebar-primary-foreground: #171717;
+  --sidebar-accent: #EEF5F5;
+  --sidebar-accent-foreground: #171717;
+  --sidebar-border: #333333;
+  --sidebar-ring: #D9961A;
+}
+
+html,
+body,
+#__next {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.45;
+  transition: background-color 0.45s ease, color 0.45s ease;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--primary);
+}
+
+/* ---------------------------
+   TIPOGRAFIA
+--------------------------- */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+p,
+a,
+span,
+label {
+  color: var(--primary);
+  font-weight: 500;
+}
+
+/* ---------------------------
+   BOTÕES
+--------------------------- */
+.btn-primary {
+  background-color: var(--primary);
+  color: var(--text-on-dark);
+  padding: 0.6rem 1.2rem;
+  border-radius: var(--radius);
+  font-weight: 600;
+  transition: 0.3s ease;
+}
+
+.btn-primary:hover {
+  background-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.btn-accent {
+  background-color: var(--accent);
+  color: var(--text-on-dark);
+  padding: 0.6rem 1.2rem;
+  border-radius: var(--radius);
+  font-weight: 600;
+  transition: 0.3s ease;
+}
+
+.btn-accent:hover {
+  background-color: var(--primary);
+  transform: translateY(-1px);
+}
+
+/* ---------------------------
+   CARDS
+--------------------------- */
+.bg-card {
+  background-color: var(--card);
+  color: var(--card-foreground);
+  border-radius: var(--radius);
+  border: 2px solid var(--accent);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  transition: background-color 0.35s ease, border-color 0.35s ease,
+    color 0.35s ease;
+}
+
+/* ---------------------------
+   SIDEBAR
+--------------------------- */
+.sidebar {
+  background-color: var(--sidebar);
+  color: var(--sidebar-foreground);
+  transition: background-color 0.35s ease, color 0.35s ease;
+}
+
+.sidebar a {
+  color: inherit;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.sidebar a:hover {
+  color: var(--accent);
+}
+
+/* ---------------------------
+   FOCUS
+--------------------------- */
+:focus {
+  outline: none;
+}
+
+:focus-visible {
+  box-shadow: 0 0 0 3px var(--ring);
+  border-radius: var(--radius);
+}
+
+/* ---------------------------
+   CONTAINERS
+--------------------------- */
+.container-fixed {
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 1rem;
+}
+
+/* ---------------------------
+   BASE LAYOUT TAILWIND
+--------------------------- */
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  input,
+  textarea,
+  select,
+  button {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    outline: none;
+    padding: 0.5rem 0.75rem;
+    background-color: var(--surface);
+    color: var(--primary);
+    transition: background-color 0.35s ease, color 0.35s ease;
+  }
+
+  input:focus,
+  textarea:focus,
+  select:focus,
+  button:focus {
+    box-shadow: 0 0 0 3px var(--ring);
+  }
+}
