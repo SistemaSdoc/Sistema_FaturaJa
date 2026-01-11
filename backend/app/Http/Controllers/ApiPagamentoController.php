@@ -9,9 +9,9 @@ use App\Models\Fatura;
 class ApiPagamentoController extends Controller
 {
     /**
-     * Tenant atual
+     * Retorna o tenant atual
      */
-    private function tenantId()
+    private function tenantId(): string
     {
         return app('tenant')->id;
     }
@@ -19,7 +19,7 @@ class ApiPagamentoController extends Controller
     /**
      * Buscar pagamento garantindo tenant
      */
-    private function findPagamento($id)
+    private function findPagamento(string $id)
     {
         return Pagamento::where('id', $id)
             ->where('tenant_id', $this->tenantId())
@@ -29,14 +29,13 @@ class ApiPagamentoController extends Controller
     /**
      * Pagamentos de uma fatura
      */
-    public function index($faturaId)
+    public function index(string $faturaId)
     {
-        $fatura = Fatura::where('tenant_id', $this->tenantId())
-            ->findOrFail($faturaId);
+        $fatura = Fatura::where('id', $faturaId)
+            ->where('tenant_id', $this->tenantId())
+            ->firstOrFail();
 
-        return response()->json(
-            $fatura->pagamentos()->get()
-        );
+        return response()->json($fatura->pagamentos);
     }
 
     /**
@@ -44,42 +43,41 @@ class ApiPagamentoController extends Controller
      */
     public function all()
     {
-        return response()->json(
-            Pagamento::where('tenant_id', $this->tenantId())
-                ->with('fatura')
-                ->get()
-        );
+        $pagamentos = Pagamento::where('tenant_id', $this->tenantId())
+            ->with('fatura')
+            ->get();
+
+        return response()->json($pagamentos);
     }
 
     /**
      * Criar pagamento
      */
-    public function store(Request $request, $faturaId)
+    public function store(Request $request, string $faturaId)
     {
-        $fatura = Fatura::where('tenant_id', $this->tenantId())
-            ->findOrFail($faturaId);
+        $fatura = Fatura::where('id', $faturaId)
+            ->where('tenant_id', $this->tenantId())
+            ->firstOrFail();
 
         $data = $request->validate([
-            'data_pagamento'   => 'required|date',
-            'valor_pago'       => 'required|numeric|min:0',
+            'data_pagamento' => 'required|date',
+            'valor_pago' => 'required|numeric|min:0',
             'metodo_pagamento' => 'required|in:dinheiro,transferencia,cartao,pix',
         ]);
 
-        // cálculos
         $totalPago = $fatura->pagamentos()->sum('valor_pago') + $data['valor_pago'];
         $troco = max(0, $totalPago - $fatura->valor_total);
 
         $pagamento = $fatura->pagamentos()->create([
-            'tenant_id'        => $this->tenantId(),
-            'data_pagamento'   => $data['data_pagamento'],
-            'valor_pago'       => $data['valor_pago'],
-            'valor_troco'      => $troco,
-            'valor_desconto'   => 0,
+            'tenant_id' => $this->tenantId(),
+            'data_pagamento' => $data['data_pagamento'],
+            'valor_pago' => $data['valor_pago'],
+            'valor_troco' => $troco,
+            'valor_desconto' => 0,
             'metodo_pagamento' => $data['metodo_pagamento'],
-            'status'           => 'confirmado',
+            'status' => 'confirmado',
         ]);
 
-        // 🔥 fecha a fatura se pago
         if ($totalPago >= $fatura->valor_total) {
             $fatura->update(['status' => 'pago']);
         }
@@ -90,7 +88,7 @@ class ApiPagamentoController extends Controller
     /**
      * Mostrar pagamento
      */
-    public function show($faturaId, $id)
+    public function show(string $faturaId, string $id)
     {
         return response()->json(
             $this->findPagamento($id)->load('fatura')
@@ -100,15 +98,15 @@ class ApiPagamentoController extends Controller
     /**
      * Atualizar pagamento
      */
-    public function update(Request $request, $faturaId, $id)
+    public function update(Request $request, string $faturaId, string $id)
     {
         $pagamento = $this->findPagamento($id);
 
         $data = $request->validate([
-            'data_pagamento'   => 'required|date',
-            'valor_pago'       => 'required|numeric|min:0',
+            'data_pagamento' => 'required|date',
+            'valor_pago' => 'required|numeric|min:0',
             'metodo_pagamento' => 'required|in:dinheiro,transferencia,cartao,pix',
-            'status'           => 'required|in:pendente,confirmado,cancelado',
+            'status' => 'required|in:pendente,confirmado,cancelado',
         ]);
 
         $pagamento->update($data);
@@ -119,21 +117,19 @@ class ApiPagamentoController extends Controller
     /**
      * Remover pagamento
      */
-    public function destroy($faturaId, $id)
+    public function destroy(string $faturaId, string $id)
     {
         $pagamento = $this->findPagamento($id);
         $fatura = $pagamento->fatura;
 
         $pagamento->delete();
 
-        // 🔄 recalcula status da fatura
+        // Atualiza status da fatura
         $totalPago = $fatura->pagamentos()->sum('valor_pago');
         if ($totalPago < $fatura->valor_total) {
             $fatura->update(['status' => 'pendente']);
         }
 
-        return response()->json([
-            'message' => 'Pagamento removido com sucesso'
-        ]);
+        return response()->json(['message' => 'Pagamento removido com sucesso']);
     }
 }

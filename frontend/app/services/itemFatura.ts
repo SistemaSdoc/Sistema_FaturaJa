@@ -15,7 +15,16 @@ export interface ItemFatura {
   valor_desconto_unitario?: number;
 }
 
+export interface ItemFaturaCreate {
+  produto_id: string;
+  quantidade: number;
+}
+
+
 // ================= MÉTODOS =================
+
+
+
 
 /**
  * Listar todos os itens de uma fatura
@@ -28,13 +37,13 @@ export const getItensFatura = async (faturaId: string): Promise<ItemFatura[]> =>
 /**
  * Criar item de fatura
  */
-export const createItemFatura = async (
+export async function createItemFatura(
   faturaId: string,
-  item: Omit<ItemFatura, 'id'>
-): Promise<ItemFatura> => {
-  const { data } = await api.post<ItemFatura>(`/faturas/${faturaId}/itens`, item);
-  return data;
-};
+  data: ItemFaturaCreate
+) {
+  const res = await api.post(`/faturas/${faturaId}/itens`, data);
+  return res.data;
+}
 
 /**
  * Atualizar item de fatura

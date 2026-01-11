@@ -3,16 +3,16 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import MainEmpresa from '../../../components/MainEmpresa';
+
 import { createFatura } from '../../../services/faturas';
-import { ProdutoApi } from '../../../services/produtos';
 import { createItemFatura } from '../../../services/itemFatura';
 import { getClientes } from '../../../services/clientes';
-import { getProdutosAll } from '../../../services/produtos';
+import { getProdutosAll, ProdutoApi } from '../../../services/produtos';
 
 /* ===================== TIPOS ===================== */
 
 interface Cliente {
-  id: string; // UUID
+  id: string;
   nome: string;
 }
 
@@ -24,7 +24,6 @@ interface ItemForm {
 
 interface FormFatura {
   clienteId: string;
-  numero: string;
   dataEmissao: string;
   dataVencimento: string;
   status: 'pendente' | 'pago' | 'cancelado';
@@ -43,7 +42,6 @@ export default function NovaFaturaPage() {
 
   const [form, setForm] = useState<FormFatura>({
     clienteId: '',
-    numero: '',
     dataEmissao: '',
     dataVencimento: '',
     status: 'pendente',
@@ -54,10 +52,16 @@ export default function NovaFaturaPage() {
 
   useEffect(() => {
     async function loadData() {
-      const [c, p] = await Promise.all([getClientes(), getProdutosAll()]);
-    console.log(clientes);
-      setClientes(c);
-      setProdutos(p);
+      try {
+        const [c, p] = await Promise.all([
+          getClientes(),
+          getProdutosAll(),
+        ]);
+        setClientes(c);
+        setProdutos(p);
+      } catch (error) {
+        console.error('Erro ao carregar dados', error);
+      }
     }
     loadData();
   }, []);
@@ -104,85 +108,76 @@ export default function NovaFaturaPage() {
 
     return (
       acc +
-      item.quantidade * prod.valor_unitario * (1 + prod.imposto / 100)
+      item.quantidade *
+        prod.valor_unitario *
+        (1 + prod.imposto / 100)
     );
   }, 0);
 
   /* ===================== SALVAR ===================== */
 
-  const salvarFatura = async () => {
-    if (!form.clienteId || !form.numero || !form.dataEmissao || !form.dataVencimento) {
-      alert('Preencha todos os campos obrigatórios');
-      return;
-    }
+ const salvarFatura = async () => {
+  if (!form.clienteId || !form.dataEmissao || !form.dataVencimento) {
+    alert('Preencha todos os campos obrigatórios');
+    return;
+  }
 
-    if (itens.length === 0) {
-      alert('Adicione pelo menos um item');
-      return;
-    }
+  if (itens.length === 0) {
+    alert('Adicione pelo menos um item');
+    return;
+  }
 
-    if (itens.some(i => !i.produtoId || i.quantidade <= 0)) {
-      alert('Todos os itens devem ter produto e quantidade válida');
-      return;
-    }
+  setLoading(true);
 
-    setLoading(true);
+  try {
+    const fatura = await createFatura({
+      cliente_id: form.clienteId,
+      data_emissao: form.dataEmissao,
+      data_vencimento: form.dataVencimento,
+      status: form.status,
+      tipo: form.tipo,
+    });
 
-    try {
-      // 1️⃣ Criar fatura
-      const fatura = await createFatura({
-        cliente_id: form.clienteId,
-        numero: form.numero,
-        data_emissao: form.dataEmissao,
-        data_vencimento: form.dataVencimento,
-        status: form.status,
-        tipo: form.tipo,
+    for (const item of itens) {
+      await createItemFatura(fatura.id, {
+        produto_id: item.produtoId,
+        quantidade: item.quantidade,
       });
-
-for (const item of itens) {
-  const produto = produtos.find(p => p.id === item.produtoId);
-  if (!produto) continue; // evita erro caso produto não exista
-
-  await createItemFatura(fatura.id, {
-    produto_id: produto.id,
-    descricao: produto.nome,
-    quantidade: item.quantidade,
-    valor_unitario: produto.valor_unitario,
-    imposto: produto.imposto,
-  });
-}
-
-
-      alert('Fatura criada com sucesso');
-      router.push('/dashboard/Faturas');
-    } catch (err) {
-      console.error(err);
-      alert('Erro ao criar fatura');
-    } finally {
-      setLoading(false);
     }
-  };
+
+    alert('Fatura criada com sucesso');
+    router.push('/dashboard/Faturas');
+  } catch (error) {
+    console.error(error);
+    alert('Erro ao criar fatura');
+  } finally {
+    setLoading(false);
+  }
+};
 
   /* ===================== UI ===================== */
 
   return (
     <MainEmpresa>
       <div className="max-w-5xl space-y-6">
-        <h1 className="text-2xl font-bold text-[#123859]">Criar Fatura</h1>
+        <h1 className="text-2xl font-bold text-[#123859]">
+          Criar Fatura
+        </h1>
 
         {/* FORMULÁRIO */}
         <div className="bg-white p-6 rounded shadow space-y-4">
           {/* CLIENTE */}
-          <div>
+          <div className="flex flex-col">
             <label htmlFor="clienteId" className="font-semibold">
               Cliente
             </label>
             <select
               id="clienteId"
-              name="clienteId"
-              className="border p-2 rounded w-full"
+              className="border p-2 rounded"
               value={form.clienteId}
-              onChange={e => handleChange('clienteId', e.target.value)}
+              onChange={e =>
+                handleChange('clienteId', e.target.value)
+              }
             >
               <option value="">Selecione o cliente</option>
               {clientes.map(c => (
@@ -193,66 +188,54 @@ for (const item of itens) {
             </select>
           </div>
 
-          {/* NÚMERO */}
-          <div>
-            <label htmlFor="numeroFatura" className="font-semibold">
-              Número da Fatura
-            </label>
-            <input
-              id="numeroFatura"
-              name="numero"
-              type="text"
-              className="border p-2 rounded w-full"
-              value={form.numero}
-              onChange={e => handleChange('numero', e.target.value)}
-              placeholder="Número da Fatura"
-            />
-          </div>
-
           {/* DATAS */}
           <div className="grid md:grid-cols-2 gap-4">
-            <div>
+            <div className="flex flex-col">
               <label htmlFor="dataEmissao" className="font-semibold">
                 Data de Emissão
               </label>
               <input
                 id="dataEmissao"
-                name="data_emissao"
                 type="date"
-                className="border p-2 rounded w-full"
+                className="border p-2 rounded"
                 value={form.dataEmissao}
-                onChange={e => handleChange('dataEmissao', e.target.value)}
+                onChange={e =>
+                  handleChange('dataEmissao', e.target.value)
+                }
               />
             </div>
 
-            <div>
+            <div className="flex flex-col">
               <label htmlFor="dataVencimento" className="font-semibold">
                 Data de Vencimento
               </label>
               <input
                 id="dataVencimento"
-                name="data_vencimento"
                 type="date"
-                className="border p-2 rounded w-full"
+                className="border p-2 rounded"
                 value={form.dataVencimento}
-                onChange={e => handleChange('dataVencimento', e.target.value)}
+                onChange={e =>
+                  handleChange('dataVencimento', e.target.value)
+                }
               />
             </div>
           </div>
 
           {/* STATUS & TIPO */}
           <div className="grid md:grid-cols-2 gap-4">
-            <div>
+            <div className="flex flex-col">
               <label htmlFor="statusFatura" className="font-semibold">
                 Status
               </label>
               <select
                 id="statusFatura"
-                name="status"
-                className="border p-2 rounded w-full"
+                className="border p-2 rounded"
                 value={form.status}
                 onChange={e =>
-                  handleChange('status', e.target.value as FormFatura['status'])
+                  handleChange(
+                    'status',
+                    e.target.value as FormFatura['status']
+                  )
                 }
               >
                 <option value="pendente">Pendente</option>
@@ -261,17 +244,19 @@ for (const item of itens) {
               </select>
             </div>
 
-            <div>
+            <div className="flex flex-col">
               <label htmlFor="tipoFatura" className="font-semibold">
                 Tipo
               </label>
               <select
                 id="tipoFatura"
-                name="tipo"
-                className="border p-2 rounded w-full"
+                className="border p-2 rounded"
                 value={form.tipo}
                 onChange={e =>
-                  handleChange('tipo', e.target.value as FormFatura['tipo'])
+                  handleChange(
+                    'tipo',
+                    e.target.value as FormFatura['tipo']
+                  )
                 }
               >
                 <option value="proforma">Proforma</option>
@@ -284,24 +269,36 @@ for (const item of itens) {
 
         {/* ITENS */}
         <div className="bg-white p-6 rounded shadow space-y-3">
-          <h2 className="font-semibold text-lg">Itens da Fatura</h2>
+          <h2 className="font-semibold text-lg">
+            Itens da Fatura
+          </h2>
+
           {itens.map((item, i) => {
-            const produtoSelecionado = produtos.find(p => p.id === item.produtoId);
+            const produto = produtos.find(
+              p => p.id === item.produtoId
+            );
+
             return (
-              <div key={item.id} className="grid grid-cols-6 gap-2 items-center">
+              <div
+                key={item.id}
+                className="grid grid-cols-6 gap-2 items-center"
+              >
                 <label htmlFor={`produto-${i}`} className="sr-only">
                   Produto
                 </label>
                 <select
                   id={`produto-${i}`}
-                  value={item.produtoId}
-                  onChange={e => updateItem(i, 'produtoId', e.target.value)}
                   className="border p-2 rounded col-span-2"
+                  value={item.produtoId}
+                  onChange={e =>
+                    updateItem(i, 'produtoId', e.target.value)
+                  }
                 >
                   <option value="">Selecione o produto</option>
                   {produtos.map(p => (
                     <option key={p.id} value={p.id}>
-                      {p.nome} (€{p.valor_unitario.toFixed(2)} + {p.imposto}%)
+                      {p.nome} (€{p.valor_unitario.toFixed(2)} +{' '}
+                      {p.imposto}%)
                     </option>
                   ))}
                 </select>
@@ -315,13 +312,23 @@ for (const item of itens) {
                   min={1}
                   className="border p-2 rounded"
                   value={item.quantidade}
-                  onChange={e => updateItem(i, 'quantidade', Number(e.target.value))}
+                  onChange={e =>
+                    updateItem(
+                      i,
+                      'quantidade',
+                      Number(e.target.value)
+                    )
+                  }
                 />
 
-                <div className="flex items-center justify-between col-span-2">
-                  <span className="text-gray-700 font-medium">
-                    {produtoSelecionado
-                      ? `€${(item.quantidade * produtoSelecionado.valor_unitario * (1 + produtoSelecionado.imposto / 100)).toFixed(2)}`
+                <div className="flex justify-between col-span-2">
+                  <span className="font-medium">
+                    {produto
+                      ? `€${(
+                          item.quantidade *
+                          produto.valor_unitario *
+                          (1 + produto.imposto / 100)
+                        ).toFixed(2)}`
                       : '—'}
                   </span>
                   <button
@@ -353,14 +360,12 @@ for (const item of itens) {
         {/* AÇÕES */}
         <div className="flex gap-3">
           <button
-            type="button"
             onClick={salvarFatura}
             className="bg-[#123859] text-white px-6 py-2 rounded"
           >
             {loading ? 'Salvando...' : 'Criar Fatura'}
           </button>
           <button
-            type="button"
             onClick={() => router.back()}
             className="bg-gray-400 text-white px-6 py-2 rounded"
           >

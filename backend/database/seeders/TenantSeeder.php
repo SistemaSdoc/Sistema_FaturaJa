@@ -135,7 +135,7 @@ class TenantSeeder extends Seeder
                 'valor_pago' => $fatura->valor_total,
                 'valor_troco' => 0,
                 'valor_total_desconto' => 0,
-                'status' => 'pago',
+                'status' => 'confirmado',
                 'metodo_pagamento' => $metodos[array_rand($metodos)],
                 'created_at' => now(),
                 'updated_at' => now(),

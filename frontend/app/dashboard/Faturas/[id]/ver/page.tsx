@@ -3,9 +3,16 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import MainLayout from '../../../../components/MainEmpresa';
-import { Fatura, getFatura, ItemFatura } from '../../../../services/faturas';
+import { Fatura, getFatura } from '../../../../services/faturas';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+
+/* ===== Tipagem jsPDF ===== */
+interface JsPDFWithAutoTable extends jsPDF {
+  lastAutoTable?: {
+    finalY: number;
+  };
+}
 
 export default function VerFaturaPage() {
   const { id } = useParams() as { id: string };
@@ -14,23 +21,12 @@ export default function VerFaturaPage() {
   const [fatura, setFatura] = useState<Fatura | null>(null);
   const [loading, setLoading] = useState(true);
 
+  /* ================= LOAD FATURA ================= */
   useEffect(() => {
     async function loadFatura() {
       try {
         const data = await getFatura(id);
-
-        const formatted: Fatura = {
-          ...data,
-          itens: (data.itens ?? []).map((item: ItemFatura) => ({
-            id: item.id,
-            descricao: item.descricao ?? 'Produto',
-            quantidade: item.quantidade,
-            valor_unitario: item.valor_unitario,
-            imposto: item.imposto ?? 0,
-          })),
-        };
-
-        setFatura(formatted);
+        setFatura(data); // ✅ total e itens já calculados pelo backend
       } catch (err) {
         console.error('Erro ao carregar fatura', err);
       } finally {
@@ -57,69 +53,56 @@ export default function VerFaturaPage() {
     );
   }
 
+  /* ================= EXPORT PDF ================= */
   const exportPDF = () => {
     const doc = new jsPDF();
+    const pdf = doc as JsPDFWithAutoTable;
 
     doc.setFontSize(16);
-    doc.text(`Fatura ${fatura.numero}`, 14, 20);
+    doc.text(`Fatura Nº ${fatura.numero}`, 14, 20);
+
     doc.setFontSize(12);
     doc.text(`Cliente: ${fatura.cliente.nome}`, 14, 30);
-    doc.text(
-      `Data: ${fatura.data_emissao} | Vencimento: ${fatura.data_vencimento}`,
-      14,
-      36
-    );
-    doc.text(`Status: ${fatura.status} | Série: ${fatura.serie}`, 14, 42);
+    doc.text(`Emissão: ${fatura.data_emissao}`, 14, 36);
+    doc.text(`Vencimento: ${fatura.data_vencimento}`, 14, 42);
+    doc.text(`Status: ${fatura.status}`, 14, 48);
 
     autoTable(doc, {
+      startY: 60,
       head: [['Descrição', 'Qtd', 'Preço Unit.', 'Imposto', 'Total']],
-      body: fatura.itens.map(it => [
-        it.descricao,
-        it.quantidade.toString(),
-        `Kz ${it.valor_unitario.toFixed(2)}`,
-        `${it.imposto}%`,
-        `Kz ${(it.quantidade * it.valor_unitario * (1 + it.imposto / 100)).toFixed(2)}`,
+      body: fatura.itens.map(item => [
+        item.produto.nome,
+        item.quantidade.toString(),
+        `Kz ${item.produto.preco_unitario.toFixed(2)}`,
+        `${item.produto.imposto_percent}%`,
+        `Kz ${item.produto.preco_unitario.toFixed(2)}`, // ✅ usa o total já calculado
       ]),
-      startY: 50,
     });
 
-    const finalY = doc.lastAutoTable?.finalY ?? 60;
+    const finalY = pdf.lastAutoTable?.finalY ?? 70;
     doc.text(`Total: Kz ${fatura.valor_total.toFixed(2)}`, 14, finalY + 10);
 
     doc.save(`fatura_${fatura.numero}.pdf`);
   };
 
+  /* ================= UI ================= */
   return (
     <MainLayout>
       <div className="max-w-4xl mx-auto py-6">
         {/* Cabeçalho */}
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-[#123859]">
-            Fatura {fatura.numero}
-          </h1>
-
+          <h1 className="text-2xl font-bold text-[#123859]">Fatura {fatura.numero}</h1>
           <div className="flex gap-2">
             <button
               onClick={() => router.push(`/dashboard/Faturas/${fatura.id}/editar`)}
               className="px-3 py-2 bg-orange-500 text-white rounded"
-              aria-label="Editar fatura"
             >
               Editar
             </button>
-
-            <button
-              onClick={exportPDF}
-              className="px-3 py-2 bg-[#123859] text-white rounded"
-              aria-label="Exportar fatura em PDF"
-            >
+            <button onClick={exportPDF} className="px-3 py-2 bg-[#123859] text-white rounded">
               Exportar PDF
             </button>
-
-            <button
-              onClick={() => router.push('/dashboard/Faturas')}
-              className="px-3 py-2 border rounded"
-              aria-label="Voltar à lista de faturas"
-            >
+            <button onClick={() => router.push('/dashboard/Faturas')} className="px-3 py-2 border rounded">
               Voltar
             </button>
           </div>
@@ -132,60 +115,54 @@ export default function VerFaturaPage() {
               <p className="text-sm text-gray-500">
                 Status:{' '}
                 <span
-                  className={`font-semibold ${
+                  className={`font-semibold capitalize ${
                     fatura.status === 'pago'
-                      ? 'text-green-500'
+                      ? 'text-green-600'
                       : fatura.status === 'pendente'
-                      ? 'text-yellow-500'
-                      : 'text-red-500'
+                      ? 'text-yellow-600'
+                      : 'text-red-600'
                   }`}
                 >
                   {fatura.status}
                 </span>
               </p>
             </div>
-
             <div className="text-right">
-              <p className="text-sm text-gray-500">
-                Data: {fatura.data_emissao}
-              </p>
-              <p className="text-sm text-gray-500">
-                Vencimento: {fatura.data_vencimento}
-              </p>
-              <p className="text-lg font-bold text-[#123859]">
-                Kz {fatura.valor_total.toFixed(2)}
-              </p>
+              <p className="text-sm text-gray-500">Emissão: {fatura.data_emissao}</p>
+              <p className="text-sm text-gray-500">Vencimento: {fatura.data_vencimento}</p>
+              <p className="text-lg font-bold text-[#123859]">Kz {fatura.valor_total.toFixed(2)}</p>
             </div>
           </div>
 
+          {/* Cliente */}
           <div className="mb-4">
             <h3 className="font-semibold mb-2">Cliente</h3>
             <p>{fatura.cliente.nome}</p>
           </div>
 
+          {/* Itens */}
           <div className="mb-4">
             <h3 className="font-semibold mb-2">Itens</h3>
             <div className="space-y-2">
-              {fatura.itens.map(it => (
-                <div key={it.id} className="flex justify-between">
+              {fatura.itens.map(item => (
+                <div key={item.id} className="flex justify-between">
                   <div>
-                    <div className="font-medium">{it.descricao}</div>
+                    <div className="font-medium">{item.produto.nome}</div>
                     <div className="text-sm text-gray-500">
-                      {it.quantidade} × Kz {it.valor_unitario.toFixed(2)} ({it.imposto}%)
+                      {item.quantidade} × Kz {item.produto.preco_unitario.toFixed(2)} ({item.produto.imposto_percent}%)
                     </div>
                   </div>
-                  <div className="font-medium">
-                    Kz {(it.quantidade * it.valor_unitario * (1 + it.imposto / 100)).toFixed(2)}
-                  </div>
+                  <div className="font-medium">Kz {item.produto.preco_unitario.toFixed(2)}</div> {/* ✅ total backend */}
                 </div>
               ))}
             </div>
           </div>
 
-          {fatura.notas && (
+          {/* Notas */}
+          {fatura.nota && (
             <div>
               <h3 className="font-semibold mb-2">Notas</h3>
-              <p>{fatura.notas}</p>
+              <p>{fatura.nota}</p>
             </div>
           )}
         </div>

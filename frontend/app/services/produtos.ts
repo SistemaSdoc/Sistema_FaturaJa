@@ -15,6 +15,8 @@ export interface ProdutoApi {
   updated_at?: string;
 }
 
+
+
 /* ================= MÉTODOS ================= */
 
 /**
@@ -30,9 +32,10 @@ export async function getProdutosAll(): Promise<ProdutoApi[]> {
  */
 export async function createProduto(produto: {
   nome: string;
-  descricao?: string;
+  descricao?: string | null;
   valor_unitario: number;
-  estoque?: number;
+  estoque?: number | null;
+  imposto: number;
 }): Promise<ProdutoApi> {
   const { data } = await api.post<ProdutoApi>("/produtos", produto);
   return data;
@@ -45,9 +48,10 @@ export async function updateProduto(
   produtoId: string,
   produto: Partial<{
     nome: string;
-    descricao?: string;
+    descricao?: string | null;
     valor_unitario: number;
-    estoque?: number;
+    estoque?: number | null;
+    imposto: number;
   }>
 ): Promise<ProdutoApi> {
   const { data } = await api.put<ProdutoApi>(`/produtos/${produtoId}`, produto);

@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
@@ -12,13 +11,19 @@ use Illuminate\Auth\Events\Registered;
 class ApiTenantUserController extends Controller
 {
     /**
+     * Retorna o tenant atual
+     */
+    private function tenantId(): string
+    {
+        return app('tenant')->id;
+    }
+
+    /**
      * Listar usuários do tenant
      */
     public function index()
     {
-        $tenantId = app('tenant')->id;
-
-        $users = TenantUser::where('tenant_id', $tenantId)->get();
+        $users = TenantUser::where('tenant_id', $this->tenantId())->get();
 
         return response()->json($users);
     }
@@ -28,7 +33,7 @@ class ApiTenantUserController extends Controller
      */
     public function store(Request $request)
     {
-        $tenantId = app('tenant')->id;
+        $tenantId = $this->tenantId();
 
         $request->validate([
             'name' => 'required|string|max:255',
@@ -62,11 +67,9 @@ class ApiTenantUserController extends Controller
     /**
      * Mostrar usuário específico
      */
-    public function show($id)
+    public function show(string $id)
     {
-        $tenantId = app('tenant')->id;
-
-        $user = TenantUser::where('tenant_id', $tenantId)
+        $user = TenantUser::where('tenant_id', $this->tenantId())
             ->where('id', $id)
             ->firstOrFail();
 
@@ -76,9 +79,9 @@ class ApiTenantUserController extends Controller
     /**
      * Atualizar usuário
      */
-    public function update(Request $request, $id)
+    public function update(Request $request, string $id)
     {
-        $tenantId = app('tenant')->id;
+        $tenantId = $this->tenantId();
 
         $user = TenantUser::where('tenant_id', $tenantId)
             ->where('id', $id)
@@ -89,7 +92,8 @@ class ApiTenantUserController extends Controller
             'email' => [
                 'required',
                 'email',
-                Rule::unique(TenantUser::class, 'email')->ignore($user->id)->where(fn($q) => $q->where('tenant_id', $tenantId)),
+                Rule::unique(TenantUser::class, 'email')->ignore($user->id)
+                    ->where(fn($q) => $q->where('tenant_id', $tenantId)),
             ],
             'role' => 'required|in:admin,cliente',
         ]);
@@ -105,16 +109,14 @@ class ApiTenantUserController extends Controller
     /**
      * Deletar usuário
      */
-    public function destroy($id)
+    public function destroy(string $id)
     {
-        $tenantId = app('tenant')->id;
-
-        $user = TenantUser::where('tenant_id', $tenantId)
+        $user = TenantUser::where('tenant_id', $this->tenantId())
             ->where('id', $id)
             ->firstOrFail();
 
         // Evitar deletar o próprio usuário logado
-        if(auth()->guard('tenant')->id() === $user->id){
+        if (auth()->guard('tenant')->id() === $user->id) {
             return response()->json([
                 'message' => 'Você não pode deletar sua própria conta!'
             ], 403);

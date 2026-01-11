@@ -9,6 +9,7 @@ class ItemFatura extends TenantModel
     use HasFactory;
 
     protected $table = 'itens_fatura';
+    protected $connection = 'tenant';
 
     protected $fillable = [
         'fatura_id',

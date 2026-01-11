@@ -130,8 +130,7 @@ class BICSeeder extends Seeder
                 'id' => Str::uuid(),
                 'fatura_id' => $faturaId,
                 'data_pagamento' => now(),
-                'status' => 'pago',
-                
+                'status' => 'confirmado',
                 'valor_troco' => 0,
                 'valor_total_desconto' => 0,
                 'tenant_id' => $tenant->id,

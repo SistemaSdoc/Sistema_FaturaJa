@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 class Pagamento extends TenantModel
 {
     use HasFactory;
+    protected $connection = 'tenant';
 
     protected $fillable = [
         'tenant_id',

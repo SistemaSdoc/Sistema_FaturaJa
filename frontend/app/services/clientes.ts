@@ -1,46 +1,39 @@
 // services/clientes.ts
-import axios from "./axios"; // seu axios configurado com baseURL e headers
+import api from './axios';
 
 /* ===================== TIPOS ===================== */
 
 export interface Cliente {
-  id: string;          // UUID
+  id: string;
   nome: string;
   email?: string;
   telefone?: string;
-  tipo_cliente: "empresa" | "consumidor_final";
+  tipo_cliente: 'empresa' | 'consumidor_final';
   nif: string;
 }
 
 /* ===================== FUNÇÕES ===================== */
 
-/**
- * Listar todos os clientes do tenant atual
- */
-export const getClientes = async (): Promise<Cliente[]> => {
-  const res = await axios.get("/clientes");
-  return res.data;
-};
+export async function getClientes(): Promise<Cliente[]> {
+  const response = await api.get('/clientes');
+  return response.data?.data ?? response.data ?? [];
+}
 
-/**
- * Criar novo cliente
- */
-export const createCliente = async (cliente: Omit<Cliente, "id">): Promise<Cliente> => {
-  const res = await axios.post("/clientes", cliente);
-  return res.data.data; // conforme seu controller, o cliente vem em res.data.data
-};
-
-/**
- * Atualizar cliente existente
- */
-export const updateCliente = async (id: string, cliente: Omit<Cliente, "id">): Promise<Cliente> => {
-  const res = await axios.put(`/clientes/${id}`, cliente);
+export const createCliente = async (
+  cliente: Omit<Cliente, 'id'>
+): Promise<Cliente> => {
+  const res = await api.post('/clientes', cliente);
   return res.data.data;
 };
 
-/**
- * Remover cliente
- */
+export const updateCliente = async (
+  id: string,
+  cliente: Omit<Cliente, 'id'>
+): Promise<Cliente> => {
+  const res = await api.put(`/clientes/${id}`, cliente);
+  return res.data.data;
+};
+
 export const deleteCliente = async (id: string): Promise<void> => {
-  await axios.delete(`/clientes/${id}`);
+  await api.delete(`/clientes/${id}`);
 };

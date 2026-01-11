@@ -8,14 +8,19 @@ use Illuminate\Http\Request;
 class ApiClienteController extends Controller
 {
     /**
-     * Listar clientes do tenant atual
+     * Retorna o tenant atual
+     */
+    private function tenantId(): string
+    {
+        return app('tenant')->id;
+    }
+
+    /**
+     * Listar clientes do tenant
      */
     public function index()
     {
-        $tenantId = app('tenant')->id;
-
-        $clientes = Cliente::where('tenant_id', $tenantId)->get();
-
+        $clientes = Cliente::where('tenant_id', $this->tenantId())->get();
         return response()->json($clientes);
     }
 
@@ -24,8 +29,6 @@ class ApiClienteController extends Controller
      */
     public function store(Request $request)
     {
-        $tenantId = app('tenant')->id;
-
         $request->validate([
             'nome'          => 'required|string|max:100',
             'email'         => 'nullable|email|max:100',
@@ -34,13 +37,12 @@ class ApiClienteController extends Controller
             'nif'           => 'required_if:tipo_cliente,empresa|max:20',
         ]);
 
-        // 🎯 Regra de negócio do NIF
         $nif = $request->tipo_cliente === 'empresa'
             ? $request->nif
             : ($request->nif ?? '999999999');
 
         $cliente = Cliente::create([
-            'tenant_id'    => $tenantId,
+            'tenant_id'    => $this->tenantId(),
             'nome'         => $request->nome,
             'email'        => $request->email,
             'telefone'     => $request->telefone,
@@ -57,23 +59,17 @@ class ApiClienteController extends Controller
     /**
      * Mostrar cliente
      */
-    public function show($id)
+    public function show(string $id)
     {
-        $tenantId = app('tenant')->id;
-
-        $cliente = Cliente::where('tenant_id', $tenantId)
-            ->findOrFail($id);
-
+        $cliente = Cliente::where('tenant_id', $this->tenantId())->findOrFail($id);
         return response()->json($cliente);
     }
 
     /**
      * Atualizar cliente
      */
-    public function update(Request $request, $id)
+    public function update(Request $request, string $id)
     {
-        $tenantId = app('tenant')->id;
-
         $request->validate([
             'nome'          => 'required|string|max:100',
             'email'         => 'nullable|email|max:100',
@@ -82,10 +78,8 @@ class ApiClienteController extends Controller
             'nif'           => 'required_if:tipo_cliente,empresa|max:20',
         ]);
 
-        $cliente = Cliente::where('tenant_id', $tenantId)
-            ->findOrFail($id);
+        $cliente = Cliente::where('tenant_id', $this->tenantId())->findOrFail($id);
 
-        // 🎯 Regra do NIF na atualização
         $nif = $request->tipo_cliente === 'empresa'
             ? $request->nif
             : ($request->nif ?? '999999999');
@@ -107,13 +101,9 @@ class ApiClienteController extends Controller
     /**
      * Remover cliente
      */
-    public function destroy($id)
+    public function destroy(string $id)
     {
-        $tenantId = app('tenant')->id;
-
-        $cliente = Cliente::where('tenant_id', $tenantId)
-            ->findOrFail($id);
-
+        $cliente = Cliente::where('tenant_id', $this->tenantId())->findOrFail($id);
         $cliente->delete();
 
         return response()->json([

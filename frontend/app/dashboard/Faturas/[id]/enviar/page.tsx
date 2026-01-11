@@ -3,254 +3,207 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import MainLayout from '../../../../components/MainEmpresa';
-
-type Status = 'Pago' | 'Pendente' | 'Cancelada';
-
-interface LineItem {
-  id: number;
-  descricao: string;
-  quantidade: number;
-  precoUnitario: number;
-  impostoPercent: number;
-}
-
-interface Fatura {
-  id: number;
-  numero: string;
-  cliente: string;
-  emailCliente?: string;
-  data: string;
-  vencimento: string;
-  total: number;
-  status: Status;
-  serie: string;
-  items?: LineItem[];
-  notas?: string;
-}
+import { getFatura, Fatura } from '../../../../services/faturas';
+import api from '../../../../services/axios';
 
 export default function EnviarFaturaPage() {
   const router = useRouter();
-  const params = useParams() as { id?: string };
-  const id = params?.id ?? '';
+  const { id } = useParams() as { id: string };
 
   const [fatura, setFatura] = useState<Fatura | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
   const [toEmail, setToEmail] = useState('');
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
 
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-
+  /* ================= LOAD FATURA ================= */
   useEffect(() => {
-    if (!id) return;
-
-    const fetchInvoice = async () => {
-      setLoading(true);
-      setError('');
+    async function load() {
       try {
-        if (!token) throw new Error('Usuário não autenticado');
-
-        const res = await fetch(`/api/invoices/${id}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        if (!res.ok) throw new Error('Erro ao carregar fatura');
-
-        const data: Fatura = await res.json();
+        const data = await getFatura(id);
         setFatura(data);
 
-        // preencher email padrão / assunto / mensagem
-        if (data.emailCliente) setToEmail(data.emailCliente);
         setSubject(`Fatura ${data.numero} — FacturaJá`);
-        setMessage(`Olá ${data.cliente},\n\nSegue em anexo a fatura nº ${data.numero} no valor de €${Number(
-          data.total
-        ).toFixed(2)}.\n\nAtenciosamente,\nFacturaJá`);
-      } catch (err: unknown) {
-        console.error(err);
-        if (err instanceof Error) setError(err.message);
-        else setError('Erro desconhecido ao carregar fatura.');
+        setMessage(
+          `Olá ${data.cliente.nome},\n\nSegue em anexo a fatura nº ${data.numero}.\n\nAtenciosamente,\nFacturaJá`
+        );
+      } catch {
+        setError('Erro ao carregar fatura.');
       } finally {
         setLoading(false);
       }
-    };
+    }
+    load();
+  }, [id]);
 
-    fetchInvoice();
-  }, [id, token]);
-
+  /* ================= ENVIAR ================= */
   const handleSend = async () => {
     setError('');
     setSuccess('');
 
-    if (!toEmail || !/\S+@\S+\.\S+/.test(toEmail)) {
-      setError('Por favor insira um e-mail válido do destinatário.');
+    if (!toEmail) {
+      setError('Informe um email válido.');
       return;
     }
 
-    if (!fatura) return;
-
-    setSending(true);
     try {
-      if (!token) throw new Error('Usuário não autenticado');
+      setSending(true);
 
-      const res = await fetch(`/api/invoices/${id}/send`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to: toEmail, subject, message }),
+      await api.post(`/faturas/${id}/enviar`, {
+        to: toEmail,
+        subject,
+        message,
       });
 
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.message || 'Erro ao enviar fatura');
-
-      setSuccess('Fatura enviada com sucesso!');
+      setSuccess('Fatura enviada com sucesso.');
       setTimeout(() => router.push('/dashboard/Faturas'), 1500);
-    } catch (err: unknown) {
-      console.error(err);
-      if (err instanceof Error) setError(err.message);
-      else setError('Erro ao enviar fatura.');
+    } catch {
+      setError('Erro ao enviar fatura.');
     } finally {
       setSending(false);
     }
   };
 
+  if (loading) {
+    return (
+      <MainLayout>
+        <p>Carregando...</p>
+      </MainLayout>
+    );
+  }
+
+  if (!fatura) {
+    return (
+      <MainLayout>
+        <p>Fatura não encontrada.</p>
+      </MainLayout>
+    );
+  }
+
   return (
     <MainLayout>
       <div className="max-w-3xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
+
+        {/* CABEÇALHO */}
+        <div className="flex justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-[#123859]">Enviar Fatura</h1>
-            <p className="text-sm text-slate-600">Envie a fatura por email ao cliente.</p>
+            <h1 className="text-2xl font-bold text-[#123859]">
+              Enviar Fatura {fatura.numero}
+            </h1>
+            <p className="text-sm text-gray-500">
+              Envio da fatura por email ao cliente
+            </p>
           </div>
-          <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => router.push('/dashboard/Faturas')}
+            className="px-3 py-2 border rounded"
+            aria-label="Voltar"
+            title="Voltar"
+          >
+            Voltar
+          </button>
+        </div>
+
+        {error && (
+          <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">
+            {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="mb-4 p-3 bg-green-100 text-green-700 rounded">
+            {success}
+          </div>
+        )}
+
+        {/* FORM */}
+        <div className="bg-white p-6 rounded shadow space-y-4">
+
+          {/* EMAIL */}
+          <div>
+            <label htmlFor="toEmail" className="block font-medium">
+              Email do cliente
+            </label>
+            <input
+              id="toEmail"
+              type="email"
+              value={toEmail}
+              onChange={e => setToEmail(e.target.value)}
+              className="w-full border p-2 rounded"
+              placeholder="cliente@exemplo.com"
+              title="Email do cliente"
+              aria-label="Email do cliente"
+              required
+            />
+          </div>
+
+          {/* ASSUNTO */}
+          <div>
+            <label htmlFor="subject" className="block font-medium">
+              Assunto
+            </label>
+            <input
+              id="subject"
+              type="text"
+              value={subject}
+              onChange={e => setSubject(e.target.value)}
+              className="w-full border p-2 rounded"
+              placeholder="Assunto do email"
+              title="Assunto do email"
+              aria-label="Assunto do email"
+              required
+            />
+          </div>
+
+          {/* MENSAGEM */}
+          <div>
+            <label htmlFor="message" className="block font-medium">
+              Mensagem
+            </label>
+            <textarea
+              id="message"
+              value={message}
+              onChange={e => setMessage(e.target.value)}
+              rows={6}
+              className="w-full border p-2 rounded"
+              placeholder="Mensagem enviada ao cliente"
+              title="Mensagem do email"
+              aria-label="Mensagem do email"
+              required
+            />
+          </div>
+
+          {/* BOTÕES */}
+          <div className="flex justify-end gap-3">
             <button
               type="button"
-              onClick={() => router.push('/dashboard/Faturas')}
-              className="px-3 py-2 border rounded"
+              onClick={() =>
+                router.push(`/dashboard/Faturas/${fatura.id}/editar`)
+              }
+              className="px-4 py-2 border rounded"
+              title="Editar fatura"
+              aria-label="Editar fatura"
             >
-              Voltar
+              Editar
+            </button>
+
+            <button
+              type="button"
+              onClick={handleSend}
+              disabled={sending}
+              className="px-4 py-2 bg-[#F9941F] text-white rounded disabled:opacity-60"
+              title="Enviar fatura por email"
+              aria-label="Enviar fatura"
+            >
+              {sending ? 'Enviando...' : 'Enviar'}
             </button>
           </div>
         </div>
-
-        {loading && <div className="p-6 bg-white rounded shadow text-center">Carregando fatura...</div>}
-        {error && <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">{error}</div>}
-        {success && <div className="mb-4 p-3 bg-green-100 text-green-700 rounded">{success}</div>}
-
-        {!loading && fatura && (
-          <>
-            <div className="bg-white p-4 rounded shadow mb-6">
-              <div className="flex justify-between items-start">
-                <div>
-                  <div className="text-sm text-gray-500">Fatura</div>
-                  <div className="text-lg font-semibold text-[#123859]">
-                    #{fatura.numero} — Série {fatura.serie}
-                  </div>
-                  <div className="text-sm text-gray-600">{fatura.cliente}</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-sm text-gray-500">Data</div>
-                  <div>{fatura.data}</div>
-                  <div className="mt-2 text-sm text-gray-500">Vencimento</div>
-                  <div>{fatura.vencimento}</div>
-                </div>
-              </div>
-
-              <div className="mt-4 border-t pt-4">
-                <h4 className="font-medium text-sm mb-2">Itens</h4>
-                <ul className="space-y-2">
-                  {(fatura.items ?? []).map(it => (
-                    <li key={it.id} className="flex justify-between">
-                      <div>
-                        <div className="font-medium">{it.descricao}</div>
-                        <div className="text-xs text-gray-500">
-                          {it.quantidade} × €{it.precoUnitario.toFixed(2)} ({it.impostoPercent}% impostos)
-                        </div>
-                      </div>
-                      <div className="font-medium">
-                        € {(it.quantidade * it.precoUnitario * (1 + it.impostoPercent / 100)).toFixed(2)}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-                <div className="mt-4 flex justify-end text-lg font-semibold">
-                  Total: € {Number(fatura.total).toFixed(2)}
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white p-4 rounded shadow">
-              <h3 className="font-semibold mb-3">Detalhes do envio</h3>
-
-              <div className="mb-3">
-                <label htmlFor="toEmail" className="block text-sm font-medium">
-                  Para (email)
-                </label>
-                <input
-                  id="toEmail"
-                  type="email"
-                  className="w-full border p-2 rounded"
-                  value={toEmail}
-                  onChange={e => setToEmail(e.target.value)}
-                  placeholder="cliente@exemplo.com"
-                  required
-                  aria-required="true"
-                />
-              </div>
-
-              <div className="mb-3">
-                <label htmlFor="subject" className="block text-sm font-medium">
-                  Assunto
-                </label>
-                <input
-                  id="subject"
-                  type="text"
-                  className="w-full border p-2 rounded"
-                  value={subject}
-                  onChange={e => setSubject(e.target.value)}
-                  placeholder="Assunto do email"
-                  required
-                  aria-required="true"
-                />
-              </div>
-
-              <div className="mb-4">
-                <label htmlFor="message" className="block text-sm font-medium">
-                  Mensagem
-                </label>
-                <textarea
-                  id="message"
-                  className="w-full border p-2 rounded"
-                  rows={6}
-                  value={message}
-                  onChange={e => setMessage(e.target.value)}
-                  placeholder="Escreva a mensagem que será enviada junto da fatura"
-                  required
-                  aria-required="true"
-                />
-              </div>
-
-              <div className="flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => router.push(`/dashboard/Faturas/${fatura.id}/editar`)}
-                  className="px-4 py-2 border rounded"
-                >
-                  Editar Fatura
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSend}
-                  disabled={sending}
-                  className="px-4 py-2 bg-[#F9941F] text-white rounded disabled:opacity-60"
-                >
-                  {sending ? 'Enviando...' : 'Enviar Fatura por Email'}
-                </button>
-              </div>
-            </div>
-          </>
-        )}
       </div>
     </MainLayout>
   );

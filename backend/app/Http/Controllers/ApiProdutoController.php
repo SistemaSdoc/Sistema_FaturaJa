@@ -2,54 +2,109 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
-use App\Models\Produto;
 use Illuminate\Http\Request;
+use App\Models\Produto;
 
 class ApiProdutoController extends Controller
 {
-    public function index()
+    /**
+     * Retorna o tenant atual
+     */
+    private function tenantId(): string
     {
-        return Produto::doTenant()->get();
+        return app('tenant')->id;
     }
 
+    /**
+     * Listar produtos do tenant
+     */
+    public function index()
+    {
+        $produtos = Produto::where('tenant_id', $this->tenantId())->get();
+        return response()->json($produtos);
+    }
+
+    /**
+     * Criar produto
+     */
     public function store(Request $request)
     {
         $request->validate([
             'nome' => 'required|string|max:100',
             'descricao' => 'nullable|string',
-            'preco' => 'required|numeric',
-            'estoque' => 'required|integer',
+            'preco' => 'required|numeric|min:0',
+            'estoque' => 'required|integer|min:0',
             'tipo' => 'required|in:produto,servico',
         ]);
 
         $produto = Produto::create([
-            'tenant_id' => app('tenant')->id,
-            ...$request->only('nome','descricao','preco','estoque','tipo')
+            'tenant_id' => $this->tenantId(),
+            'nome' => $request->nome,
+            'descricao' => $request->descricao,
+            'preco' => $request->preco,
+            'estoque' => $request->estoque,
+            'tipo' => $request->tipo,
         ]);
 
-        return response()->json($produto, 201);
+        return response()->json([
+            'message' => 'Produto criado com sucesso',
+            'data' => $produto
+        ], 201);
     }
 
-    public function show($id)
+    /**
+     * Mostrar produto
+     */
+    public function show(string $id)
     {
-        return Produto::doTenant()->findOrFail($id);
-    }
-
-    public function update(Request $request, $id)
-    {
-        $produto = Produto::doTenant()->findOrFail($id);
-
-        $produto->update(
-            $request->only('nome','descricao','preco','estoque','tipo')
-        );
+        $produto = Produto::where('tenant_id', $this->tenantId())
+            ->findOrFail($id);
 
         return response()->json($produto);
     }
 
-    public function destroy($id)
+    /**
+     * Atualizar produto
+     */
+    public function update(Request $request, string $id)
     {
-        Produto::doTenant()->findOrFail($id)->delete();
-        return response()->json(['message' => 'Removido com sucesso']);
+        $request->validate([
+            'nome' => 'required|string|max:100',
+            'descricao' => 'nullable|string',
+            'preco' => 'required|numeric|min:0',
+            'estoque' => 'required|integer|min:0',
+            'tipo' => 'required|in:produto,servico',
+        ]);
+
+        $produto = Produto::where('tenant_id', $this->tenantId())
+            ->findOrFail($id);
+
+        $produto->update($request->only([
+            'nome',
+            'descricao',
+            'preco',
+            'estoque',
+            'tipo'
+        ]));
+
+        return response()->json([
+            'message' => 'Produto atualizado com sucesso',
+            'data' => $produto
+        ]);
+    }
+
+    /**
+     * Remover produto
+     */
+    public function destroy(string $id)
+    {
+        $produto = Produto::where('tenant_id', $this->tenantId())
+            ->findOrFail($id);
+
+        $produto->delete();
+
+        return response()->json([
+            'message' => 'Produto removido com sucesso'
+        ]);
     }
 }

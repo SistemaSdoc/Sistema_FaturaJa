@@ -1,5 +1,5 @@
-// services/pagamentos.ts
-import api from './axios';
+import api from "./axios";
+import { Fatura } from "./faturas";
 
 /* ================= TIPAGENS ================= */
 
@@ -8,16 +8,14 @@ export interface PagamentoApi {
   fatura_id: string;
   data_pagamento: string;
   valor_pago: number;
+
   valor_troco: number;
   valor_desconto: number;
-  metodo_pagamento: 'dinheiro' | 'transferencia' | 'cartao' | 'pix';
-  status: 'pendente' | 'confirmado' | 'cancelado';
+  metodo_pagamento: "dinheiro" | "transferencia" | "cartao" | "pix";
+  status: "pendente" | "confirmado" | "cancelado";
 
-  fatura?: {
-    id: string;
-    numero: string;
-    valor_total: number;
-  };
+  // 👇 relação correta com Fatura
+  fatura?: Pick<Fatura, "id" | "numero" | "valor_total" | "status">;
 
   created_at?: string;
   updated_at?: string;
@@ -29,9 +27,10 @@ export interface PagamentoApi {
  * Listar pagamentos do tenant
  */
 export async function getPagamentosAll(): Promise<PagamentoApi[]> {
-  const { data } = await api.get<PagamentoApi[]>('/pagamentos');
+  const { data } = await api.get<PagamentoApi[]>("/pagamentos/all");
   return data;
 }
+
 
 /**
  * Pagamentos de uma fatura
@@ -53,7 +52,7 @@ export async function createPagamento(
   pagamento: {
     data_pagamento: string;
     valor_pago: number;
-    metodo_pagamento: 'dinheiro' | 'transferencia' | 'cartao' | 'pix';
+    metodo_pagamento: "dinheiro" | "transferencia" | "cartao" | "pix";
   }
 ): Promise<PagamentoApi> {
   const { data } = await api.post<PagamentoApi>(
@@ -72,8 +71,8 @@ export async function updatePagamento(
   pagamento: Partial<{
     data_pagamento: string;
     valor_pago: number;
-    metodo_pagamento: 'dinheiro' | 'transferencia' | 'cartao' | 'pix';
-    status: 'pendente' | 'confirmado' | 'cancelado';
+    metodo_pagamento: "dinheiro" | "transferencia" | "cartao" | "pix";
+    status: "pendente" | "confirmado" | "cancelado";
   }>
 ): Promise<PagamentoApi> {
   const { data } = await api.put<PagamentoApi>(

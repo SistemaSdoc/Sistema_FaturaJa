@@ -35,22 +35,24 @@ class ApiTenantController extends Controller
     {
         $tenant = $this->getTenantFromHeader($request);
 
-        // Exemplo: total de faturas e pagamentos
+        // Total de faturas
         $totalFaturas = DB::table('faturas')
             ->where('tenant_id', $tenant->id)
             ->count();
 
+        // Total de pagamentos
         $totalPagamentos = DB::table('pagamentos')
             ->where('tenant_id', $tenant->id)
             ->sum('valor_pago');
 
-        // Receita da semana (exemplo)
+        // Receita por dia da última semana
         $receitaSemana = DB::table('faturas')
             ->select(
                 DB::raw('DATE(created_at) as dia'),
-                DB::raw('SUM(total) as receita')
+                DB::raw('SUM(valor_total) as receita')
             )
             ->where('tenant_id', $tenant->id)
+            ->where('created_at', '>=', now()->subDays(7))
             ->groupBy(DB::raw('DATE(created_at)'))
             ->orderBy('dia')
             ->get();
@@ -66,30 +68,19 @@ class ApiTenantController extends Controller
     }
 
     /**
-     * Lista as faturas do tenant
-     */
-    public function faturas(Request $request)
-    {
-        $tenant = $this->getTenantFromHeader($request);
-
-        $faturas = DB::table('faturas')
-            ->where('tenant_id', $tenant->id)
-            ->orderBy('created_at', 'desc')
-            ->get();
-
-        return response()->json(['data' => $faturas]);
-    }
-
-    /**
-     * Vendas por categoria
+     * Vendas por categoria (corrigido para item_faturas)
      */
     public function vendasCategorias(Request $request)
     {
         $tenant = $this->getTenantFromHeader($request);
 
-        $categorias = DB::table('faturas')
-            ->join('produtos', 'faturas.produto_id', '=', 'produtos.id')
-            ->select('produtos.categoria', DB::raw('SUM(faturas.total) as vendas'))
+        $categorias = DB::table('item_faturas')
+            ->join('produtos', 'item_faturas.produto_id', '=', 'produtos.id')
+            ->join('faturas', 'item_faturas.fatura_id', '=', 'faturas.id')
+            ->select(
+                'produtos.categoria',
+                DB::raw('SUM(item_faturas.quantidade * item_faturas.valor_unitario) as vendas')
+            )
             ->where('faturas.tenant_id', $tenant->id)
             ->groupBy('produtos.categoria')
             ->get();
