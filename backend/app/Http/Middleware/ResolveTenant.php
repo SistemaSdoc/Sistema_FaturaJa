@@ -19,6 +19,10 @@ class ResolveTenant
             return $next($request);
         }
 
+        if ($request->is('login') || $request->is('register')) {
+    return $next($request); // ignora middleware
+}
+
         // 🔹 Ignorar rotas de login/register do landlord
         if ($request->is('login') || $request->is('register') || $request->is('welcome')) {
             return $next($request);
