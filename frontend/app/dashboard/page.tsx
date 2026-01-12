@@ -9,15 +9,12 @@ export default function DashboardPage() {
   const router = useRouter();
 
   useEffect(() => {
-    // Só tenta redirecionar quando carregou user
     if (!loading) {
       if (!user) {
-        // Usuário não autenticado → login
         router.replace("/login");
         return;
       }
 
-      // Redireciona de acordo com a role
       switch (user.role) {
         case "admin":
           router.replace("/dashboard/Admin");
@@ -29,22 +26,44 @@ export default function DashboardPage() {
           router.replace("/dashboard/Clientes");
           break;
         default:
-          router.replace("/login"); // role inválida
+          router.replace("/login");
           break;
       }
     }
   }, [user, loading, router]);
 
-  // Enquanto carrega user
+  // Spinner moderno com degradê
+  const Spinner = () => (
+    <div className="flex flex-col justify-center items-center space-y-4">
+      <div className="w-16 h-16 border-4 border-t-4 border-gray-300 border-t-blue-600 rounded-full animate-spin"></div>
+      <p className="text-gray-700 text-lg font-medium">Carregando seu dashboard...</p>
+    </div>
+  );
+
+  // Estado de carregamento
   if (loading) {
-    return <p className="p-6">Carregando...</p>;
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <Spinner />
+      </div>
+    );
   }
 
-  // Se não encontrou user, mostra mensagem rápida antes do redirecionamento
+  // Usuário não encontrado
   if (!user) {
-    return <p className="p-6 text-red-500">Usuário não encontrado. Redirecionando...</p>;
+    return (
+      <div className="flex flex-col justify-center items-center h-screen space-y-2">
+        <Spinner />
+        <p className="text-red-500 text-lg font-medium">Usuário não encontrado. Redirecionando...</p>
+      </div>
+    );
   }
 
   // Redirecionando
-  return <p className="p-6">Redirecionando para seu dashboard...</p>;
+  return (
+    <div className="flex flex-col justify-center items-center h-screen space-y-2">
+      <Spinner />
+      <p className="text-gray-700 text-lg font-medium">Redirecionando para seu dashboard...</p>
+    </div>
+  );
 }

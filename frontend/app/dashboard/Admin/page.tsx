@@ -46,11 +46,9 @@ export default function EmpresaDashboard() {
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      // KPIs da empresa
       const { data: kpiData } = await api.get<KPI>('/empresa/kpis');
       setKpis(kpiData);
 
-      // Lista de empresas (ou clientes) relacionados à empresa logada
       const { data: empresasData } = await api.get<Empresa[]>('/empresa/lista');
       setEmpresas(empresasData);
     } catch (err) {
@@ -63,6 +61,25 @@ export default function EmpresaDashboard() {
   useEffect(() => {
     fetchDashboardData();
   }, []);
+
+  // Spinner moderno
+  const Spinner = () => (
+    <div className="flex flex-col justify-center items-center space-y-4">
+      <div className="w-16 h-16 border-4 border-t-4 border-gray-300 border-t-blue-600 rounded-full animate-spin"></div>
+      <p className="text-gray-700 text-lg font-medium">Carregando dados...</p>
+    </div>
+  );
+
+  // ✅ Estado de carregamento
+  if (loading) {
+    return (
+      <MainEmpresa>
+        <div className="flex justify-center items-center h-screen">
+          <Spinner />
+        </div>
+      </MainEmpresa>
+    );
+  }
 
   return (
     <MainEmpresa>
@@ -77,9 +94,7 @@ export default function EmpresaDashboard() {
         />
       </div>
 
-      {loading && <p>Carregando dados...</p>}
-
-      {!loading && kpis && (
+      {kpis && (
         <>
           {/* KPI Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
