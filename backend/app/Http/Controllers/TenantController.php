@@ -10,9 +10,12 @@ use App\Models\Tenant;
 
 class TenantController extends Controller
 {
+    /**
+     * Criar um novo tenant e inicializar o database
+     */
     public function store(Request $request)
     {
-        // Validação básica
+        // 1️⃣ Validação
         $request->validate([
             'name' => 'required|string|max:255',
             'subdomain' => 'required|string|unique:tenants,subdomain',
@@ -20,34 +23,28 @@ class TenantController extends Controller
 
         $databaseName = 'tenant_' . Str::slug($request->subdomain);
 
-        // 1️⃣ Criar database físico
+        // 2️⃣ Criar database físico
         $this->createTenantDatabase($databaseName);
 
-        // 2️⃣ Criar tenant no banco principal
+        // 3️⃣ Criar registro do tenant no banco principal
         $tenant = Tenant::create([
-            'id' => (string) Str::uuid(), // UUID
+            'id' => (string) Str::uuid(),
             'name' => $request->name,
             'subdomain' => $request->subdomain,
             'database_name' => $databaseName,
         ]);
 
-        // 3️⃣ Configurar conexão do tenant
-        config(['database.connections.tenant.database' => $databaseName]);
-        DB::purge('tenant');
-        DB::reconnect('tenant');
-        DB::setDefaultConnection('tenant'); // força o uso da conexão tenant
-
-        // 4️⃣ Forçar PDO a usar a database
-        DB::connection('tenant')->getPdo();
+        // 4️⃣ Configurar conexão do tenant dinamicamente
+        $this->configureTenantConnection($databaseName);
 
         // 5️⃣ Rodar migrations do tenant
         Artisan::call('migrate', [
             '--database' => 'tenant',
-            '--path' => 'database/migrations/tenant', // relativo à raiz do projeto
+            '--path' => 'database/migrations/tenant',
             '--force' => true,
         ]);
 
-        // 6️⃣ (Opcional) Rodar seeders do tenant
+        // 6️⃣ Rodar seeders opcionais do tenant
         Artisan::call('db:seed', [
             '--class' => 'TenantDatabaseSeeder', // crie este seeder
             '--database' => 'tenant',
@@ -61,14 +58,34 @@ class TenantController extends Controller
     }
 
     /**
-     * Cria o banco de dados do tenant
+     * Criar o banco de dados físico do tenant
      */
     protected function createTenantDatabase(string $databaseName)
     {
         try {
-            DB::statement("CREATE DATABASE IF NOT EXISTS `$databaseName` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;");
+            DB::statement(
+                "CREATE DATABASE IF NOT EXISTS `$databaseName` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+            );
         } catch (\Exception $e) {
             abort(500, "Erro ao criar database: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Configurar dinamicamente a conexão tenant
+     */
+    protected function configureTenantConnection(string $databaseName)
+    {
+        config(['database.connections.tenant.database' => $databaseName]);
+        DB::purge('tenant');
+        DB::reconnect('tenant');
+        DB::setDefaultConnection('tenant');
+
+        // Força PDO a conectar
+        try {
+            DB::connection('tenant')->getPdo();
+        } catch (\Exception $e) {
+            abort(500, "Erro ao conectar no database do tenant: " . $e->getMessage());
         }
     }
 }

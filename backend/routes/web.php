@@ -20,7 +20,6 @@ use App\Http\Middleware\ResolveTenant;
 |--------------------------------------------------------------------------
 */
 
-Route::domain('faturaja.sdoca')->group(function () {
 
     // Página inicial
     Route::view('/', 'home')->name('home');
@@ -51,7 +50,6 @@ Route::domain('faturaja.sdoca')->group(function () {
         $request->fulfill();
         return redirect()->route('tenant.dashboard');
     })->middleware('signed')->name('verification.verify');
-});
 /*
 |--------------------------------------------------------------------------
 | TENANT DOMAIN ({tenant}.faturaja.sdoca)

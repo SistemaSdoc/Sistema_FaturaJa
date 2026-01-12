@@ -16,7 +16,6 @@ class TenantUserController extends Controller
     public function index()
     {
         $tenant = app('tenant');
-
         $users = TenantUser::where('tenant_id', $tenant->id)->get();
 
         return view('tenant.users.index', compact('users'));
@@ -33,51 +32,45 @@ class TenantUserController extends Controller
     /**
      * Salvar novo usuário
      */
-   public function store(Request $request)
-{
-    $tenant = app('tenant');
+    public function store(Request $request)
+    {
+        $tenant = app('tenant');
 
-    $request->validate([
-        'name' => 'required|string|max:255',
-        'email' => [
-            'required',
-            'email',
-            Rule::unique(TenantUser::class, 'email')
-                ->where(fn ($q) => $q->where('tenant_id', $tenant->id)),
-        ],
-        'password' => 'required|min:6|confirmed',
-        'role' => 'required|in:admin,cliente',
-    ]);
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => [
+                'required',
+                'email',
+                Rule::unique(TenantUser::class, 'email')
+                    ->where(fn ($q) => $q->where('tenant_id', $tenant->id)),
+            ],
+            'password' => 'required|min:6|confirmed',
+            'role' => 'required|in:admin,cliente',
+        ]);
 
-    $user = TenantUser::create([
-        'name' => $request->name,
-        'email' => $request->email,
-        'password' => Hash::make($request->password),
-        'role' => $request->role,
-        'tenant_id' => $tenant->id,
-        'email_verified_at' => null,
-    ]);
+        $user = TenantUser::create([
+            'name' => $request->name,
+            'email' => $request->email,
+            'password' => Hash::make($request->password),
+            'role' => $request->role,
+            'tenant_id' => $tenant->id,
+            'email_verified_at' => null,
+        ]);
 
-    // Enviar notificação de verificação
-    $user->sendEmailVerificationNotification();
-    event(new Registered($user));
+        $user->sendEmailVerificationNotification();
+        event(new Registered($user));
 
-    return redirect()
-        ->route('tenant.users.index')
-        ->with('success', 'Usuário criado com sucesso! Um link de verificação foi enviado ao email.');
-}
+        return redirect()
+            ->route('tenant.users.index')
+            ->with('success', 'Usuário criado com sucesso! Um link de verificação foi enviado ao email.');
+    }
 
     /**
      * Formulário de edição
      */
     public function edit(string $id)
     {
-        $tenant = app('tenant');
-
-        $user = TenantUser::where('id', $id)
-            ->where('tenant_id', $tenant->id)
-            ->firstOrFail();
-
+        $user = $this->findTenantUser($id);
         return view('tenant.users.edit', compact('user'));
     }
 
@@ -86,11 +79,8 @@ class TenantUserController extends Controller
      */
     public function update(Request $request, string $id)
     {
+        $user = $this->findTenantUser($id);
         $tenant = app('tenant');
-
-        $user = TenantUser::where('id', $id)
-            ->where('tenant_id', $tenant->id)
-            ->firstOrFail();
 
         $request->validate([
             'name' => 'required|string|max:255',
@@ -122,16 +112,22 @@ class TenantUserController extends Controller
      */
     public function destroy(string $id)
     {
-        $tenant = app('tenant');
-
-        $user = TenantUser::where('id', $id)
-            ->where('tenant_id', $tenant->id)
-            ->firstOrFail();
-
+        $user = $this->findTenantUser($id);
         $user->delete();
 
         return redirect()
             ->route('tenant.users.index')
             ->with('success', 'Usuário excluído com sucesso!');
+    }
+
+    /**
+     * MÉTODO PRIVADO: Buscar usuário do tenant atual
+     */
+    private function findTenantUser(string $id): TenantUser
+    {
+        $tenant = app('tenant');
+        return TenantUser::where('id', $id)
+            ->where('tenant_id', $tenant->id)
+            ->firstOrFail();
     }
 }

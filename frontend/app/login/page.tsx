@@ -1,13 +1,14 @@
-"use client";
+'use client';
 
 import React, { useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useAuth } from "../context/AuthProvider";
 
 const COLOR_PRIMARY = "#123859";
 
-// ----------------- ICON -----------------
+/* ---------------- ICON ---------------- */
 const InvoiceIcon = ({
   sizeClass = "w-10 h-10",
   color = COLOR_PRIMARY,
@@ -34,7 +35,7 @@ const InvoiceIcon = ({
   </motion.svg>
 );
 
-// ----------------- INPUT -----------------
+/* ---------------- INPUT ---------------- */
 const InputField = ({
   type,
   placeholder,
@@ -56,14 +57,15 @@ const InputField = ({
   />
 );
 
-// ----------------- PAGE -----------------
+/* ---------------- PAGE ---------------- */
 export default function LoginPage() {
   const { login } = useAuth();
+  const router = useRouter();
 
-  const [email, setEmail] = useState<string>("");
-  const [password, setPassword] = useState<string>("");
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string>("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -73,47 +75,32 @@ export default function LoginPage() {
     setError("");
 
     try {
-      const data = await login(email, password);
+      const response = await login(email, password);
 
-      if (!data?.success) {
-        setError(data?.message || "Falha no login");
+      // ✅ Validar tenant e token
+      if (!response.token || !response.tenant?.subdomain) {
+        setError(response.message ?? "Falha no login");
         return;
       }
 
-      if (!data?.redirect) {
-        setError("Redirecionamento não definido pelo servidor.");
-        return;
-      }
-
-      // 🔁 REDIRECIONAMENTO CORRETO (resolve tenant null)
-      window.location.href = data.redirect;
-    } catch (err: unknown) {
-      let message = "Erro ao efetuar login";
-
-      if (err instanceof Error) {
-        message = err.message;
-      }
-
-      setError(message);
+      // 🔹 Redirecionar para dashboard interno do Next.js
+      router.replace("/dashboard");
+    } catch (err) {
+      setError("Erro ao efetuar login");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div
-      className="min-h-screen flex items-center justify-center p-4 sm:p-6 font-inter relative overflow-hidden"
-      aria-busy={loading}
-    >
-      {/* Background */}
-      <div className="absolute inset-0 bg-gradient-to-r from-[#123859] via-[#F9941F] to-[#123859] animate-gradient-x opacity-20 z-0"></div>
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
+      <div className="absolute inset-0 bg-linear-to-r from-[#123859] via-[#F9941F] to-[#123859] opacity-20 z-0" />
 
-      {/* Card */}
       <motion.div
         className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl z-10 p-6"
-        initial={{ opacity: 0, y: 50 }}
+        initial={{ opacity: 0, y: 40 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.7 }}
+        transition={{ duration: 0.6 }}
       >
         <InvoiceIcon sizeClass="w-16 h-16 mb-4 mx-auto" />
 
@@ -122,7 +109,7 @@ export default function LoginPage() {
         </h2>
 
         <p className="text-sm text-gray-500 text-center mb-4">
-          Entre com seu email e senha para acessar o sistema
+          Entre com seu email e senha
         </p>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
@@ -143,16 +130,14 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2 mt-2 rounded-xl font-semibold bg-[#123859] text-white hover:bg-[#0f2b4c] disabled:opacity-50 transition flex items-center justify-center gap-2"
+            className="w-full py-2 mt-2 rounded-xl font-semibold bg-[#123859] text-white hover:bg-[#0f2b4c] disabled:opacity-50 transition"
           >
             {loading ? "Entrando..." : "Entrar"}
           </button>
         </form>
 
         {error && (
-          <p className="text-red-600 mt-3 text-center text-sm">
-            {error}
-          </p>
+          <p className="text-red-600 mt-3 text-center text-sm">{error}</p>
         )}
 
         <div className="mt-4 text-center text-sm">

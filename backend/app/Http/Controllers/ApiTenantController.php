@@ -5,87 +5,94 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Tenant;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Http\JsonResponse;
 
 class ApiTenantController extends Controller
 {
     /**
-     * Retorna os dados do tenant atual
+     * Dados do tenant atual
      */
     public function me(Request $request)
     {
-        $tenant = $this->getTenantFromHeader($request);
+        $tenant = $this->resolveTenant($request);
+        if ($tenant instanceof JsonResponse) {
+            return $tenant;
+        }
 
         return response()->json([
             'success' => true,
             'tenant' => [
-                'id' => $tenant->id,
-                'name' => $tenant->name,
+                'id'        => $tenant->id,
+                'name'      => $tenant->name,
                 'subdomain' => $tenant->subdomain,
-                'email' => $tenant->email,
-                'nif' => $tenant->nif,
-                'logo' => $tenant->logo,
+                'email'     => $tenant->email,
+                'nif'       => $tenant->nif,
+                'logo'      => $tenant->logo,
             ],
         ]);
     }
 
     /**
-     * KPIs do tenant (dashboard)
+     * KPIs do dashboard
      */
     public function kpis(Request $request)
     {
-        $tenant = $this->getTenantFromHeader($request);
+        $tenant = $this->resolveTenant($request);
+        if ($tenant instanceof JsonResponse) {
+            return $tenant;
+        }
 
-        // Total de faturas
         $totalFaturas = DB::table('faturas')
             ->where('tenant_id', $tenant->id)
             ->count();
 
-        // Total de pagamentos
         $totalPagamentos = DB::table('pagamentos')
             ->where('tenant_id', $tenant->id)
-            ->sum('valor_pago');
+            ->sum('valor_pago') ?? 0;
 
-        // Receita por dia da última semana
         $receitaSemana = DB::table('faturas')
-            ->select(
-                DB::raw('DATE(created_at) as dia'),
-                DB::raw('SUM(valor_total) as receita')
-            )
+            ->selectRaw('DATE(created_at) as dia, SUM(valor_total) as receita')
             ->where('tenant_id', $tenant->id)
             ->where('created_at', '>=', now()->subDays(7))
-            ->groupBy(DB::raw('DATE(created_at)'))
+            ->groupByRaw('DATE(created_at)')
             ->orderBy('dia')
             ->get();
 
         return response()->json([
             'success' => true,
             'kpis' => [
-                'totalFaturas' => $totalFaturas,
-                'totalPagamentos' => $totalPagamentos,
-                'receitaSemana' => $receitaSemana,
+                'totalFaturas'     => $totalFaturas,
+                'totalPagamentos'  => $totalPagamentos,
+                'receitaSemana'    => $receitaSemana,
             ],
         ]);
     }
 
     /**
-     * Vendas por categoria (corrigido para item_faturas)
+     * Vendas por categoria
      */
     public function vendasCategorias(Request $request)
     {
-        $tenant = $this->getTenantFromHeader($request);
+        $tenant = $this->resolveTenant($request);
+        if ($tenant instanceof JsonResponse) {
+            return $tenant;
+        }
 
         $categorias = DB::table('item_faturas')
             ->join('produtos', 'item_faturas.produto_id', '=', 'produtos.id')
             ->join('faturas', 'item_faturas.fatura_id', '=', 'faturas.id')
-            ->select(
-                'produtos.categoria',
-                DB::raw('SUM(item_faturas.quantidade * item_faturas.valor_unitario) as vendas')
-            )
+            ->selectRaw('
+                COALESCE(produtos.categoria, "Sem categoria") as categoria,
+                SUM(item_faturas.quantidade * item_faturas.valor_unitario) as vendas
+            ')
             ->where('faturas.tenant_id', $tenant->id)
             ->groupBy('produtos.categoria')
             ->get();
 
-        return response()->json(['data' => $categorias]);
+        return response()->json([
+            'success' => true,
+            'data' => $categorias,
+        ]);
     }
 
     /**
@@ -93,30 +100,44 @@ class ApiTenantController extends Controller
      */
     public function pagamentos(Request $request)
     {
-        $tenant = $this->getTenantFromHeader($request);
+        $tenant = $this->resolveTenant($request);
+        if ($tenant instanceof JsonResponse) {
+            return $tenant;
+        }
 
         $pagamentos = DB::table('pagamentos')
-            ->select('status', DB::raw('SUM(valor_pago) as valor'))
+            ->selectRaw('status, SUM(valor_pago) as valor')
             ->where('tenant_id', $tenant->id)
             ->groupBy('status')
             ->get();
 
-        return response()->json(['data' => $pagamentos]);
+        return response()->json([
+            'success' => true,
+            'data' => $pagamentos,
+        ]);
     }
 
     /**
-     * Helper para pegar o tenant pelo header X-Tenant
+     * Resolver tenant via header X-Tenant (SEM abort, SEM 500)
      */
-    private function getTenantFromHeader(Request $request)
+    private function resolveTenant(Request $request)
     {
         $subdomain = $request->header('X-Tenant');
+
         if (!$subdomain) {
-            abort(400, 'Tenant não informado');
+            return response()->json([
+                'success' => false,
+                'message' => 'Header X-Tenant não informado',
+            ], 400);
         }
 
         $tenant = Tenant::where('subdomain', $subdomain)->first();
+
         if (!$tenant) {
-            abort(404, 'Tenant não encontrado');
+            return response()->json([
+                'success' => false,
+                'message' => 'Tenant não encontrado',
+            ], 404);
         }
 
         return $tenant;

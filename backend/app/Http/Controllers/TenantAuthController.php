@@ -28,28 +28,28 @@ class TenantAuthController extends Controller
     /* =====================================================
      | LOGIN MULTI-TENANT (POR EMAIL)
      ===================================================== */
-     public function login(Request $request)
+   public function login(Request $request)
 {
     $request->validate([
         'email'    => 'required|email',
         'password' => 'required',
     ]);
 
-    // Descobrir tenant pelo email
-    $tenant = Tenant::all()->first(function ($tenant) use ($request) {
+    $host = $request->getHost();
 
-        config([
-            'database.connections.tenant.database' => $tenant->database_name,
-        ]);
+    // Se for landlord, autentica na tabela global de usuários (ou tenant_users se quiser)
+    if ($host === 'faturaja.sdoca') {
+        if (! Auth::guard('web')->attempt($request->only('email','password'))) {
+            return back()->withErrors(['password' => 'Senha inválida.']);
+        }
 
-        DB::purge('tenant');
-        DB::reconnect('tenant');
+        $request->session()->regenerate();
 
-        return DB::connection('tenant')
-            ->table('users')
-            ->where('email', $request->email)
-            ->exists();
-    });
+        return redirect()->route('home'); // ou dashboard global do landlord
+    }
+
+    // Senão, é tenant
+    $tenant = $this->findTenantByEmail($request->email);
 
     if (! $tenant) {
         return back()->withErrors([
@@ -57,48 +57,19 @@ class TenantAuthController extends Controller
         ]);
     }
 
-    // Autenticar
+    config(['database.connections.tenant.database' => $tenant->database_name]);
+    DB::purge('tenant');
+    DB::reconnect('tenant');
+
     if (! Auth::guard('tenant')->attempt($request->only('email', 'password'))) {
-        return back()->withErrors([
-            'password' => 'Senha inválida.',
-        ]);
+        return back()->withErrors(['password' => 'Senha inválida.']);
     }
 
     $request->session()->regenerate();
 
-
-return redirect()->route('tenant.dashboard', [
-    'tenant' => $tenant->subdomain,
-]);
-
+    return redirect()->route('tenant.dashboard', ['tenant' => $tenant->subdomain]);
 }
 
-
-
-
-    /* =====================================================
-     | REGISTRO (OPCIONAL – USAR QUANDO SUBDOMÍNIO JÁ ESTÁ RESOLVIDO)
-     ===================================================== */
-    public function register(Request $request)
-    {
-        $request->validate([
-            'name'     => 'required|string|max:255',
-            'email'    => 'required|email',
-            'password' => 'required|min:6|confirmed',
-        ]);
-
-        // Assumindo que ResolveTenant já definiu a conexão 'tenant'
-        $user = TenantUser::create([
-            'name'     => $request->name,
-            'email'    => $request->email,
-            'password' => Hash::make($request->password),
-            'role'     => 'cliente',
-        ]);
-
-        Auth::guard('tenant')->login($user);
-
-        return redirect()->route('tenant.dashboard');
-    }
 
     /* =====================================================
      | LOGOUT
@@ -110,7 +81,23 @@ return redirect()->route('tenant.dashboard', [
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        // Redireciona para login global
         return redirect()->route('tenant.login');
+    }
+
+    /* =====================================================
+     | MÉTODOS PRIVADOS
+     ===================================================== */
+    private function findTenantByEmail(string $email)
+    {
+        return Tenant::all()->first(function ($tenant) use ($email) {
+            config(['database.connections.tenant.database' => $tenant->database_name]);
+            DB::purge('tenant');
+            DB::reconnect('tenant');
+
+            return DB::connection('tenant')
+                ->table('users')
+                ->where('email', $email)
+                ->exists();
+        });
     }
 }

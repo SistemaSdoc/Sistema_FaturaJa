@@ -10,12 +10,11 @@ use Illuminate\Support\Str;
 class FaturaWebController extends Controller
 {
     /**
-     * Listar todas as faturas do tenant
+     * Listar todas as faturas do tenant atual
      */
     public function index()
     {
         $tenantId = app('tenant')->id;
-
         $faturas = Fatura::where('tenant_id', $tenantId)->get();
 
         return view('tenant.faturas.index', compact('faturas'));
@@ -27,7 +26,6 @@ class FaturaWebController extends Controller
     public function create()
     {
         $tenantId = app('tenant')->id;
-
         $clientes = Cliente::where('tenant_id', $tenantId)->get();
 
         return view('tenant.faturas.create', compact('clientes'));
@@ -40,9 +38,9 @@ class FaturaWebController extends Controller
     {
         $tenantId = app('tenant')->id;
 
-        // ✅ Validação simples (SEM unique)
         $request->validate([
             'cliente_id' => 'required|uuid',
+            'nome_cliente' => 'required|string|max:100',
             'nif_cliente' => 'required|string|max:20',
             'numero' => 'required|string|max:20',
             'data_emissao' => 'required|date',
@@ -52,33 +50,25 @@ class FaturaWebController extends Controller
             'tipo' => 'required|in:proforma,fatura,recibo',
         ]);
 
-        // ✅ Garante que o cliente pertence ao tenant
-        Cliente::where('id', $request->cliente_id)
+        // Confirma que o cliente pertence ao tenant
+        $cliente = Cliente::where('id', $request->cliente_id)
             ->where('tenant_id', $tenantId)
             ->firstOrFail();
 
-        // ✅ UNIQUE manual (tenant-safe)
-        if (Fatura::where('tenant_id', $tenantId)
-            ->where('nif_cliente', $request->nif_cliente)
-            ->exists()) {
-            return back()->withErrors([
-                'nif_cliente' => 'NIF já existe neste tenant'
-            ])->withInput();
-        }
-
+        // Checa UNIQUE por tenant para número
         if (Fatura::where('tenant_id', $tenantId)
             ->where('numero', $request->numero)
             ->exists()) {
             return back()->withErrors([
-                'numero' => 'Número da fatura já existe neste tenant'
+                'numero' => 'Número da fatura já existe neste tenant.'
             ])->withInput();
         }
 
-        // ✅ Criar fatura
         Fatura::create([
             'id' => Str::uuid(),
             'tenant_id' => $tenantId,
-            'cliente_id' => $request->cliente_id,
+            'cliente_id' => $cliente->id,
+            'nome_cliente' => $request->nome_cliente,
             'nif_cliente' => $request->nif_cliente,
             'numero' => $request->numero,
             'data_emissao' => $request->data_emissao,
@@ -98,9 +88,8 @@ class FaturaWebController extends Controller
      */
     public function edit($id)
     {
+        $fatura = $this->findTenantFatura($id);
         $tenantId = app('tenant')->id;
-
-        $fatura = Fatura::where('tenant_id', $tenantId)->findOrFail($id);
         $clientes = Cliente::where('tenant_id', $tenantId)->get();
 
         return view('tenant.faturas.edit', compact('fatura', 'clientes'));
@@ -112,11 +101,11 @@ class FaturaWebController extends Controller
     public function update(Request $request, $id)
     {
         $tenantId = app('tenant')->id;
-
-        $fatura = Fatura::where('tenant_id', $tenantId)->findOrFail($id);
+        $fatura = $this->findTenantFatura($id);
 
         $request->validate([
             'cliente_id' => 'required|uuid',
+            'nome_cliente' => 'required|string|max:100',
             'nif_cliente' => 'required|string|max:20',
             'numero' => 'required|string|max:20',
             'data_emissao' => 'required|date',
@@ -126,36 +115,23 @@ class FaturaWebController extends Controller
             'tipo' => 'required|in:proforma,fatura,recibo',
         ]);
 
-        // ✅ UNIQUE manual (ignore a própria fatura)
-        if (
-            Fatura::where('tenant_id', $tenantId)
-                ->where('nif_cliente', $request->nif_cliente)
-                ->where('id', '!=', $fatura->id)
-                ->exists()
-        ) {
-            return back()->withErrors([
-                'nif_cliente' => 'NIF já existe neste tenant'
-            ])->withInput();
-        }
-
-        if (
-            Fatura::where('tenant_id', $tenantId)
-                ->where('numero', $request->numero)
-                ->where('id', '!=', $fatura->id)
-                ->exists()
-        ) {
-            return back()->withErrors([
-                'numero' => 'Número da fatura já existe neste tenant'
-            ])->withInput();
-        }
-
-        // ✅ Confirma cliente do tenant
-        Cliente::where('id', $request->cliente_id)
+        $cliente = Cliente::where('id', $request->cliente_id)
             ->where('tenant_id', $tenantId)
             ->firstOrFail();
 
+        // UNIQUE por tenant, ignorando a própria fatura
+        if (Fatura::where('tenant_id', $tenantId)
+            ->where('numero', $request->numero)
+            ->where('id', '!=', $fatura->id)
+            ->exists()) {
+            return back()->withErrors([
+                'numero' => 'Número da fatura já existe neste tenant.'
+            ])->withInput();
+        }
+
         $fatura->update([
-            'cliente_id' => $request->cliente_id,
+            'cliente_id' => $cliente->id,
+            'nome_cliente' => $request->nome_cliente,
             'nif_cliente' => $request->nif_cliente,
             'numero' => $request->numero,
             'data_emissao' => $request->data_emissao,
@@ -175,13 +151,22 @@ class FaturaWebController extends Controller
      */
     public function destroy($id)
     {
-        $tenantId = app('tenant')->id;
-
-        $fatura = Fatura::where('tenant_id', $tenantId)->findOrFail($id);
+        $fatura = $this->findTenantFatura($id);
         $fatura->delete();
 
         return redirect()
             ->route('tenant.faturas.index')
             ->with('success', 'Fatura eliminada com sucesso!');
+    }
+
+    /**
+     * MÉTODO PRIVADO: Buscar fatura do tenant atual
+     */
+    private function findTenantFatura($id): Fatura
+    {
+        $tenantId = app('tenant')->id;
+        return Fatura::where('tenant_id', $tenantId)
+            ->where('id', $id)
+            ->firstOrFail();
     }
 }

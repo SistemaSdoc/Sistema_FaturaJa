@@ -12,47 +12,48 @@ class ResolveTenant
 {
     public function handle(Request $request, Closure $next)
     {
-        /**
-         * 🔹 Ignorar apenas o LOGIN
-         * (logout e outras rotas precisam do tenant)
-         */
-        if ($request->is('api/login')) {
+        $host = $request->getHost();
+
+        // 🔹 Ignorar landlord
+        if ($host === 'faturaja.sdoca') {
             return $next($request);
         }
 
-        /**
-         * 🔑 PRIORIDADE 1: HEADER (API / Axios)
-         * Header: X-Tenant
-         */
-        $subdomain = $request->header('X-Tenant');
-
-        /**
-         * 🔑 PRIORIDADE 2: SUBDOMÍNIO (Frontend)
-         * ex: bic.faturaja.sdoca
-         */
-        if (! $subdomain) {
-            $host = $request->getHost();
-
-            if (str_contains($host, '.')) {
-                $parts = explode('.', $host);
-                $subdomain = $parts[0];
-            }
+        // 🔹 Ignorar rotas de login/register do landlord
+        if ($request->is('login') || $request->is('register') || $request->is('welcome')) {
+            return $next($request);
         }
 
-        if (! $subdomain) {
+        $subdomain = null;
+
+        // 1️⃣ Prioridade Header X-Tenant (API / Axios)
+        if ($request->header('X-Tenant')) {
+            $subdomain = $request->header('X-Tenant');
+        }
+
+        // 2️⃣ Subdomínio (frontend)
+        if (!$subdomain && str_contains($host, '.')) {
+            $parts = explode('.', $host);
+            $subdomain = $parts[0];
+        }
+
+        // 3️⃣ Se não encontrar subdomínio
+        if (!$subdomain) {
             return response()->json([
                 'error' => 'Tenant não informado'
             ], 400);
         }
 
+        // 4️⃣ Buscar tenant no DB
         $tenant = Tenant::where('subdomain', $subdomain)->first();
 
-        if (! $tenant) {
+        if (!$tenant) {
             return response()->json([
                 'error' => "Tenant '{$subdomain}' não existe"
             ], 404);
         }
 
+        // 5️⃣ Bootstrap do tenant
         $this->bootstrapTenant($tenant);
 
         return $next($request);
@@ -67,21 +68,18 @@ class ResolveTenant
             throw new \Exception("Tenant {$tenant->subdomain} não tem database_name definido");
         }
 
-        // Configurar DB do tenant
-        config([
-            'database.connections.tenant.database' => $tenant->database_name,
-        ]);
-
+        // Configurar conexão DB
+        config(['database.connections.tenant.database' => $tenant->database_name]);
         DB::purge('tenant');
         DB::reconnect('tenant');
 
-        // Disponível globalmente
+        // Disponível globalmente via app('tenant')
         app()->instance('tenant', $tenant);
 
-        // 🔹 Log de sucesso
-        Log::info("Tenant resolvido", [
-            'tenant' => $tenant->name,
-            'subdomain' => $tenant->subdomain,
+        // Log
+        Log::info("Tenant resolvido com sucesso", [
+            'tenant'   => $tenant->name,
+            'subdomain'=> $tenant->subdomain,
             'database' => $tenant->database_name,
         ]);
     }

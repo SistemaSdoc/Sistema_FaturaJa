@@ -23,8 +23,8 @@ return new class extends Migration
         });
     }
 
-    public function down(): void
+        public function down(): void
     {
-        Schema::dropIfExists('personal_access_tokens');
+        Schema::connection('tenant')->dropIfExists('personal_access_tokens');
     }
 };

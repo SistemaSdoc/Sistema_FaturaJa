@@ -1,9 +1,19 @@
 'use client';
 
 import React, { useEffect, useState } from "react";
-import { XAxis, YAxis, Tooltip, ResponsiveContainer,
-  BarChart, Bar, PieChart, Pie, Cell, Legend
+import {
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  Legend
 } from "recharts";
+
 import MainEmpresa from "../../components/MainEmpresa";
 import Modal from "@/app/components/Modal";
 import ProdutoForm from "@/app/components/ProdutoForm";
@@ -29,12 +39,12 @@ import {
 
 /* ================= TIPOS ================= */
 
-export interface ProdutoSelecionado {
+interface ProdutoSelecionado {
   id: string;
   quantidade: number;
 }
 
-export interface FaturaCreate {
+interface FaturaCreate {
   cliente_id: string;
   nome_cliente: string;
   produtos: ProdutoSelecionado[];
@@ -46,7 +56,13 @@ export interface FaturaCreate {
   tipo: "fatura" | "proforma" | "recibo";
 }
 
+interface VendaCategoria {
+  categoria: string;
+  vendas: number;
+}
+
 /* ================= COMPONENT ================= */
+
 export default function DashboardEmpresa() {
   const { tenant } = useAuth();
 
@@ -55,9 +71,7 @@ export default function DashboardEmpresa() {
   const [faturas, setFaturas] = useState<Fatura[]>([]);
   const [pagamentos, setPagamentos] = useState<Pagamento[]>([]);
   const [produtos, setProdutos] = useState<Produto[]>([]);
-  const [vendasCategorias, setVendasCategorias] = useState<
-    { categoria: string; vendas: number }[]
-  >([]);
+  const [vendasCategorias, setVendasCategorias] = useState<VendaCategoria[]>([]);
 
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
@@ -65,16 +79,13 @@ export default function DashboardEmpresa() {
   const [showProdutoModal, setShowProdutoModal] = useState(false);
   const [showFaturaModal, setShowFaturaModal] = useState(false);
 
-  const pieColors = ["#4ade80", "#f87171"];
+  const pieColors = ["#4ade80", "#f87171", "#60a5fa", "#facc15"];
 
-  /* ================= FILTRO ================= */
-  const filteredFaturas = Array.isArray(faturas)
-    ? faturas.filter(
-        f =>
-          f.numero.toLowerCase().includes(search.toLowerCase()) ||
-          f.cliente?.nome?.toLowerCase().includes(search.toLowerCase())
-      )
-    : [];
+  /* ================= FILTRO FATURAS ================= */
+  const filteredFaturas = faturas.filter(f =>
+    f.numero.toLowerCase().includes(search.toLowerCase()) ||
+    f.cliente?.nome?.toLowerCase().includes(search.toLowerCase())
+  );
 
   /* ================= FETCH DASHBOARD ================= */
   const fetchDashboardData = async () => {
@@ -95,17 +106,29 @@ export default function DashboardEmpresa() {
         getFaturasAll(),
         getPagamentosAll(),
         getProdutosAll(),
-        api.get("/empresa/vendas-categorias")
+        api.get<{ data: VendaCategoria[] }>("/empresa/vendas-categorias")
       ]);
 
       setEmpresa(empresaRes);
       setKpis(kpisRes);
+
       setFaturas(Array.isArray(faturasRes) ? faturasRes : []);
       setPagamentos(Array.isArray(pagamentosRes) ? pagamentosRes : []);
       setProdutos(Array.isArray(produtosRes) ? produtosRes : []);
-      setVendasCategorias(vendasCatRes.data ?? []);
-    } catch (err) {
-      console.error("Erro ao carregar dashboard:", err);
+
+      setVendasCategorias(Array.isArray(vendasCatRes.data?.data)
+        ? vendasCatRes.data.data
+        : []
+      );
+
+    } catch (error) {
+      console.error("Erro ao carregar dashboard:", error);
+      setFaturas([]);
+      setPagamentos([]);
+      setProdutos([]);
+      setVendasCategorias([]);
+      setKpis(null);
+      setEmpresa(null);
     } finally {
       setLoading(false);
     }
@@ -179,11 +202,23 @@ export default function DashboardEmpresa() {
       {!loading && kpis && (
         <>
           {/* KPIs */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <Kpi label="Faturamento Mensal" value={`€ ${kpis.faturamentoMensal}`} />
-            <Kpi label="Pagamentos Pendentes" value={kpis.pagamentosPendentes} />
-            <Kpi label="Clientes" value={kpis.totalClientes} />
-            <Kpi label="Novas Faturas" value={kpis.novasFaturas} />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <Kpi label="Total de Faturas" value={kpis.totalFaturas} />
+            <Kpi label="Total Recebido" value={`€ ${kpis.totalPagamentos}`} />
+            <Kpi label="Dias com Receita" value={kpis.receitaSemana.length} />
+          </div>
+
+          {/* Receita semanal */}
+          <div className="bg-white p-4 rounded shadow mb-6">
+            <h2 className="font-semibold mb-2">Receita da Última Semana</h2>
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={kpis.receitaSemana}>
+                <XAxis dataKey="dia" />
+                <YAxis />
+                <Tooltip />
+                <Bar dataKey="receita" fill="#4ade80" />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
 
           {/* Vendas por Categoria */}
@@ -207,7 +242,7 @@ export default function DashboardEmpresa() {
                 <Pie
                   data={pagamentos.map(p => ({
                     status: p.fatura?.status ?? "pendente",
-                    valor: p.valor_pago
+                    valor: Number(p.valor_pago) || 0
                   }))}
                   dataKey="valor"
                   nameKey="status"
@@ -265,12 +300,7 @@ export default function DashboardEmpresa() {
 }
 
 /* ================= KPI COMPONENT ================= */
-interface KpiProps {
-  label: string;
-  value: string | number;
-}
-
-function Kpi({ label, value }: KpiProps) {
+function Kpi({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="bg-white p-4 rounded shadow">
       <p className="text-sm text-gray-500">{label}</p>
@@ -278,4 +308,3 @@ function Kpi({ label, value }: KpiProps) {
     </div>
   );
 }
-

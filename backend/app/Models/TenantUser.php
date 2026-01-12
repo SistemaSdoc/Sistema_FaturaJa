@@ -7,6 +7,7 @@ use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Support\Str;
 use Illuminate\Contracts\Auth\MustVerifyEmail; 
+use App\Models\PersonalAccessToken as TenantPersonalAccessToken;
 use Illuminate\Auth\MustVerifyEmail as MustVerifyEmailTrait; 
 
 class TenantUser extends Authenticatable implements MustVerifyEmail
@@ -37,6 +38,10 @@ class TenantUser extends Authenticatable implements MustVerifyEmail
         'email_verified_at' => 'datetime',
     ];
 
+       public function tokens()
+    {
+        return $this->morphMany(TenantPersonalAccessToken::class, 'tokenable');
+    }
     protected static function boot(): void
     {
         parent::boot();

@@ -6,10 +6,11 @@ return [
     |--------------------------------------------------------------------------
     | Default Authentication Guard
     |--------------------------------------------------------------------------
+    | Para API usamos Sanctum como padrão
     */
     'defaults' => [
-        'guard' => env('AUTH_GUARD', 'web'),
-        'passwords' => env('AUTH_PASSWORD_BROKER', 'users'),
+        'guard' => 'sanctum',
+        'passwords' => 'tenant_users',
     ],
 
     /*
@@ -17,63 +18,64 @@ return [
     | Authentication Guards
     |--------------------------------------------------------------------------
     */
-'guards' => [
-    'web' => [
-        'driver' => 'session',
-        'provider' => 'users', // landlord
+    'guards' => [
+
+        // Usado apenas se tiveres páginas web (opcional)
+        'web' => [
+            'driver' => 'session',
+            'provider' => 'users',
+        ],
+
+        // Guard principal da API (TENANT)
+        'sanctum' => [
+            'driver' => 'sanctum',
+            'provider' => 'tenant_users',
+        ],
+
     ],
-
-    'tenant' => [
-        'driver' => 'session',
-        'provider' => 'tenant_users', // tenant users
-    ],
-
-
-    'sanctum' => [
-        'driver' => 'sanctum',
-        'provider' => 'tenant_users',
-    ],
-
-],
-
 
     /*
     |--------------------------------------------------------------------------
     | User Providers
     |--------------------------------------------------------------------------
     */
-'providers' => [
-    'users' => [
-        'driver' => 'eloquent',
-        'model' => App\Models\User::class,
-    ],
+    'providers' => [
 
-    'tenant_users' => [
-        'driver' => 'eloquent',
-        'model' => App\Models\TenantUser::class,
-    ],
-],
+        // Landlord / Admin global
+        'users' => [
+            'driver' => 'eloquent',
+            'model' => App\Models\User::class,
+        ],
 
+        // Usuários do tenant (EMPRESA)
+        'tenant_users' => [
+            'driver' => 'eloquent',
+            'model' => App\Models\TenantUser::class,
+        ],
+
+    ],
 
     /*
     |--------------------------------------------------------------------------
-    | Reset de Senha
+    | Password Reset Settings
     |--------------------------------------------------------------------------
     */
     'passwords' => [
+
         'users' => [
             'provider' => 'users',
-            'table' => env('AUTH_PASSWORD_RESET_TOKEN_TABLE', 'password_reset_tokens'),
+            'table' => 'password_reset_tokens',
             'expire' => 60,
             'throttle' => 60,
         ],
 
         'tenant_users' => [
             'provider' => 'tenant_users',
-            'table' => 'tenant_password_resets', // tabela específica do tenant
+            'table' => 'tenant_password_resets',
             'expire' => 60,
             'throttle' => 60,
         ],
+
     ],
 
     /*
@@ -81,6 +83,6 @@ return [
     | Password Confirmation Timeout
     |--------------------------------------------------------------------------
     */
-    'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
+    'password_timeout' => 10800,
 
 ];

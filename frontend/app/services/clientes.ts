@@ -1,7 +1,4 @@
-// services/clientes.ts
 import api from './axios';
-
-/* ===================== TIPOS ===================== */
 
 export interface Cliente {
   id: string;
@@ -11,8 +8,6 @@ export interface Cliente {
   tipo_cliente: 'empresa' | 'consumidor_final';
   nif: string;
 }
-
-/* ===================== FUNÇÕES ===================== */
 
 export async function getClientes(): Promise<Cliente[]> {
   const response = await api.get('/clientes');
