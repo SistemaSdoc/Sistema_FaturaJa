@@ -110,19 +110,10 @@ const CheckIcon = ({ color = COLOR_PRIMARY }) => (
 );
 
 // Ícone de Fatura (Usado no Logotipo e Hero)
-const InvoiceIcon = ({ sizeClass = 'w-12 h-12', color = COLOR_PRIMARY }) => (
-    <svg
-        xmlns="http://www.w3.org/2000/svg"
-        className={sizeClass}
-        style={{ color: color }}
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        strokeWidth={1.5}
-    >
-        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-    </svg>
+const InvoiceIcon = ({ sizeClass = 'w-12 h-12' }) => (
+    <img src="/images/3.png" alt="Invoice Icon" className={sizeClass} />
 );
+
 
 
 // Ícone: Headset (Suporte Técnico)
@@ -192,12 +183,16 @@ const StepCard = ({ number, title, description, delay }) => (
 // Componente Visual Grande para a Secção Hero
 const HeroVisual = () => (
     <AnimatedSection animation="slide-left" delay={500} threshold={0.1}>
-        <div className="hidden lg:flex justify-center items-center p-12 rounded-3xl h-full shadow-2xl" style={{ backgroundColor: COLOR_SECONDARY_BG }}>
+        <div
+            className="hidden lg:flex justify-center items-center p-12 rounded-3xl h-full shadow-2xl"
+            style={{ backgroundColor: COLOR_SECONDARY_BG }}
+        >
             {/* Ícone de fatura gigante */}
-            <InvoiceIcon sizeClass='w-48 h-48' color={COLOR_ACCENT} />
+            <InvoiceIcon sizeClass="w-48 h-48" />
         </div>
     </AnimatedSection>
 );
+
 
 // Componente Simulação de Vídeo
 const VideoSection = () => (
@@ -208,7 +203,7 @@ const VideoSection = () => (
                 <h2 className={`text-3xl font-extrabold mb-4 text-white`}>
                     Veja o FaturaJá em Ação
                 </h2>
-                <p className={`text-lg mb-10 max-w-2xl mx-auto text-white-40 location1`}>
+                <p className={`text-lg mb-10 max-w-2xl mx-auto location1`} style={{ color: '#f2f2f2' }}>
                     Uma breve apresentação do sistema e da nossa missão para simplificar a sua faturação.
                 </p>
             </AnimatedSection>
@@ -506,14 +501,13 @@ export default function App() {
                     font-family: 'Inter', sans-serif;
                     color:"white"
                 }
-                
                 /* Classe de fundo com gradiente SUAVE e LENTO */
                 .animated-gradient-section {
                     background: linear-gradient(
-                        -30deg, 
-                        ${FOOTER_GRADIENT_START}, 
-                        ${FOOTER_GRADIENT_END}, 
-                        ${FOOTER_GRADIENT_MID}, 
+                        -30deg,
+                        ${FOOTER_GRADIENT_START},
+                        ${FOOTER_GRADIENT_END},
+                        ${FOOTER_GRADIENT_MID},
                         ${FOOTER_GRADIENT_START}
                     );
                     background-size: 400% 400%; /* Permite o movimento grande */
@@ -847,18 +841,19 @@ export default function App() {
                                 <h4 className="text-2xl font-extrabold mb-4" style={{ color: FOOTER_TEXT_COLOR }}>
                                     Fatura<span style={{ color: FOOTER_ACCENT_COLOR }}>Já</span>
                                 </h4>
-                                <p className="mb-4">
+                                <p className="mb-4" style={{ color: '#f2f2f2' }} >
                                     A sua solução definitiva para gestão e faturação simplificada. Rápido, seguro e compatível com as normas fiscais.
                                 </p>
                                 <p className="space-y-1 text-orange-500">
-                                    <span className="block location">Luanda, Angola</span>
+                                    <span className="block location" style={{ color: '#f9941f' }}>Luanda, Angola</span>
                                     <a
                                         href="mailto:geral@sdoca.it.ao"
                                         className="block font-semibold location hover:underline"
+                                        style={{ color: '#f9941f' }}
                                     >
                                         geral@sdoca.it.ao
                                     </a>
-                                    <span className="block font-semibold location">
+                                    <span className="block font-semibold location" style={{ color: '#f9941f' }}>
                                         +244 923678529 <br /> +244 927800505
                                     </span>
                                 </p>
@@ -873,7 +868,8 @@ export default function App() {
                                         <li key={link.id}>
                                             <a
                                                 onClick={() => scrollToSection(link.id)}
-                                                className={`text-white/70 hover:text-white cursor-pointer transition`}
+                                                className={` hover:text-white cursor-pointer transition`}
+                                                style={{ color: '#f2f2f2' }}
                                             >
                                                 {link.name}
                                             </a>
@@ -886,11 +882,11 @@ export default function App() {
                             <div>
                                 <h4 className={`text-lg font-semibold mb-4 text-white/70`} style={{ color: FOOTER_ACCENT_COLOR }}>Apoio e Legal</h4>
                                 <ul className="space-y-2 text-sm">
-                                    <li><a onClick={() => scrollToSection('faq')} className={`text-white/90 hover:text-white cursor-pointer transition`}>FAQ</a></li>
-                                    <li><a onClick={() => console.log('Link para Suporte Técnico')} className={`text-white/90 hover:text-white cursor-pointer transition flex items-center`}><HeadsetIcon size={4} color={FOOTER_ACCENT_COLOR} /> Suporte Técnico</a></li>
-                                    <li><a onClick={() => console.log('Link para Termos')} className={`text-white/90 hover:text-white cursor-pointer transition`}>Termos de Serviço</a></li>
-                                    <li><a onClick={() => console.log('Link para Política')} className={`text-white/90 hover:text-white cursor-pointer transition`}>Política de Privacidade</a></li>
-                                    <li><a onClick={() => console.log('Link para Livro de Reclamações')} className={`text-white/90 hover:text-white cursor-pointer transition flex items-center`}><BookIcon size={4} color={FOOTER_ACCENT_COLOR} /> Livro de Reclamações</a></li>
+                                    <li><a onClick={() => scrollToSection('faq')} className={` hover:text-white cursor-pointer transition`} style={{ color: '#f2f2f2' }}>FAQ</a></li>
+                                    <li><a onClick={() => console.log('Link para Suporte Técnico')} className={`text-white/90 hover:text-white cursor-pointer transition flex items-center`} style={{ color: '#f2f2f2' }}><HeadsetIcon size={4} color={FOOTER_ACCENT_COLOR} /> Suporte Técnico</a></li>
+                                    <li><a onClick={() => console.log('Link para Termos')} className={`text-white/90 hover:text-white cursor-pointer transition`} style={{ color: '#f2f2f2' }}>Termos de Serviço</a></li>
+                                    <li><a onClick={() => console.log('Link para Política')} className={`text-white/90 hover:text-white cursor-pointer transition`} style={{ color: '#f2f2f2' }}>Política de Privacidade</a></li>
+                                    <li><a onClick={() => console.log('Link para Livro de Reclamações')} className={`text-white/90 hover:text-white cursor-pointer transition flex items-center`} style={{ color: '#f2f2f2' }}><BookIcon size={4} color={FOOTER_ACCENT_COLOR} /> Livro de Reclamações</a></li>
                                 </ul>
                             </div>
 
@@ -904,7 +900,7 @@ export default function App() {
                                         rel="noopener noreferrer"
                                         className="p-2 rounded-full transition-all duration-300 hover:bg-[#F9941F]/10"
                                     >
-                                        <Facebook size={22} color="#F9941F" className="hover:scale-110 transition-transform" />
+                                        <Facebook size={22} color="#f2f2f2" className="hover:scale-110 transition-transform" />
                                     </a>
 
                                     <a
@@ -913,7 +909,7 @@ export default function App() {
                                         rel="noopener noreferrer"
                                         className="p-2 rounded-full transition-all duration-300 hover:bg-[#F9941F]/10"
                                     >
-                                        <Instagram size={22} color="#F9941F" className="hover:scale-110 transition-transform" />
+                                        <Instagram size={22} color="#f2f2f2" className="hover:scale-110 transition-transform" />
                                     </a>
 
                                     <a
@@ -922,7 +918,7 @@ export default function App() {
                                         rel="noopener noreferrer"
                                         className="p-2 rounded-full transition-all duration-300 hover:bg-[#F9941F]/10"
                                     >
-                                        <Linkedin size={22} color="#F9941F" className="hover:scale-110 transition-transform" />
+                                        <Linkedin size={22} color="#f2f2f2" className="hover:scale-110 transition-transform" />
                                     </a>
                                 </div>
                             </div>
