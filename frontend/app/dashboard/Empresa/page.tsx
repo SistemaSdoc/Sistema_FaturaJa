@@ -1,17 +1,13 @@
 'use client';
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   XAxis,
   YAxis,
   Tooltip,
   ResponsiveContainer,
   BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell,
-  Legend
+  Bar
 } from "recharts";
 
 import MainEmpresa from "../../components/MainEmpresa";
@@ -20,11 +16,14 @@ import ProdutoForm from "@/app/components/ProdutoForm";
 import FaturaForm from "@/app/components/FaturaForm";
 
 import { useAuth } from "../../context/AuthProvider";
-import api, {
-  fetchTenantKpis,
+
+import {
   fetchTenantMe,
+  fetchTenantKpis,
+  fetchVendasCategorias,
   Tenant,
-  TenantKpis
+  TenantKpis,
+  VendaCategoria
 } from "@/app/services/axios";
 
 import { getFaturasAll, Fatura, createFatura } from "@/app/services/faturas";
@@ -56,15 +55,10 @@ interface FaturaCreate {
   tipo: "fatura" | "proforma" | "recibo";
 }
 
-interface VendaCategoria {
-  categoria: string;
-  vendas: number;
-}
-
 /* ================= COMPONENT ================= */
 
 export default function DashboardEmpresa() {
-  const { tenant } = useAuth();
+  const { tenant, loading: authLoading } = useAuth();
 
   const [empresa, setEmpresa] = useState<Tenant | null>(null);
   const [kpis, setKpis] = useState<TenantKpis | null>(null);
@@ -79,8 +73,6 @@ export default function DashboardEmpresa() {
   const [showProdutoModal, setShowProdutoModal] = useState(false);
   const [showFaturaModal, setShowFaturaModal] = useState(false);
 
-  const pieColors = ["#4ade80", "#f87171", "#60a5fa", "#facc15"];
-
   /* ================= FILTRO FATURAS ================= */
   const filteredFaturas = faturas.filter(f =>
     f.numero.toLowerCase().includes(search.toLowerCase()) ||
@@ -88,55 +80,63 @@ export default function DashboardEmpresa() {
   );
 
   /* ================= FETCH DASHBOARD ================= */
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     if (!tenant) return;
 
     setLoading(true);
+
     try {
+      // 🔐 BUSCA O TENANT PRIMEIRO
+      const empresaRes = await fetchTenantMe();
+
+      if (!empresaRes) {
+        console.warn("Tenant não encontrado, dashboard não carregado");
+        setEmpresa(null);
+        setLoading(false);
+        return;
+      }
+
+      // 📊 BUSCA DADOS DO DASHBOARD
       const [
-        empresaRes,
         kpisRes,
         faturasRes,
         pagamentosRes,
         produtosRes,
         vendasCatRes
       ] = await Promise.all([
-        fetchTenantMe(),
         fetchTenantKpis(),
         getFaturasAll(),
         getPagamentosAll(),
         getProdutosAll(),
-        api.get<{ data: VendaCategoria[] }>("/empresa/vendas-categorias")
+        fetchVendasCategorias()
       ]);
 
       setEmpresa(empresaRes);
       setKpis(kpisRes);
-
-      setFaturas(Array.isArray(faturasRes) ? faturasRes : []);
-      setPagamentos(Array.isArray(pagamentosRes) ? pagamentosRes : []);
-      setProdutos(Array.isArray(produtosRes) ? produtosRes : []);
-
-      setVendasCategorias(Array.isArray(vendasCatRes.data?.data)
-        ? vendasCatRes.data.data
-        : []
-      );
+      setFaturas(faturasRes);
+      setPagamentos(pagamentosRes);
+      setProdutos(produtosRes);
+      setVendasCategorias(vendasCatRes);
 
     } catch (error) {
       console.error("Erro ao carregar dashboard:", error);
+      setEmpresa(null);
+      setKpis(null);
       setFaturas([]);
       setPagamentos([]);
       setProdutos([]);
       setVendasCategorias([]);
-      setKpis(null);
-      setEmpresa(null);
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchDashboardData();
   }, [tenant]);
+
+  /* ================= INIT ================= */
+  useEffect(() => {
+    if (!authLoading && tenant) {
+      fetchDashboardData();
+    }
+  }, [authLoading, tenant, fetchDashboardData]);
 
   /* ================= PRODUTOS ================= */
   const handleAddProduto = async (
@@ -165,6 +165,8 @@ export default function DashboardEmpresa() {
   };
 
   /* ================= RENDER ================= */
+  if (authLoading) return <p>Carregando autenticação...</p>;
+
   return (
     <MainEmpresa empresa={empresa}>
       <div className="flex justify-between items-center mb-6">
@@ -197,7 +199,7 @@ export default function DashboardEmpresa() {
         </button>
       </div>
 
-      {loading && <p>Carregando dados...</p>}
+      {(loading || authLoading) && <p>Carregando dados...</p>}
 
       {!loading && kpis && (
         <>
@@ -233,57 +235,6 @@ export default function DashboardEmpresa() {
               </BarChart>
             </ResponsiveContainer>
           </div>
-
-          {/* Pagamentos */}
-          <div className="bg-white p-4 rounded shadow mb-6">
-            <h2 className="font-semibold mb-2">Pagamentos</h2>
-            <ResponsiveContainer width="100%" height={200}>
-              <PieChart>
-                <Pie
-                  data={pagamentos.map(p => ({
-                    status: p.fatura?.status ?? "pendente",
-                    valor: Number(p.valor_pago) || 0
-                  }))}
-                  dataKey="valor"
-                  nameKey="status"
-                  outerRadius={70}
-                  label
-                >
-                  {pagamentos.map((_, i) => (
-                    <Cell key={i} fill={pieColors[i % pieColors.length]} />
-                  ))}
-                </Pie>
-                <Legend />
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Faturas */}
-          <div className="bg-white p-4 rounded shadow">
-            <h2 className="font-semibold mb-2">Faturas Recentes</h2>
-
-            <table className="w-full">
-              <thead>
-                <tr className="bg-gray-100">
-                  <th className="p-2">Número</th>
-                  <th className="p-2">Cliente</th>
-                  <th className="p-2">Total</th>
-                  <th className="p-2">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredFaturas.map(f => (
-                  <tr key={f.id} className="border-t">
-                    <td className="p-2">{f.numero}</td>
-                    <td className="p-2">{f.cliente?.nome}</td>
-                    <td className="p-2">€ {f.valor_total}</td>
-                    <td className="p-2">{f.status}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
         </>
       )}
 
@@ -299,7 +250,7 @@ export default function DashboardEmpresa() {
   );
 }
 
-/* ================= KPI COMPONENT ================= */
+/* ================= KPI ================= */
 function Kpi({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="bg-white p-4 rounded shadow">

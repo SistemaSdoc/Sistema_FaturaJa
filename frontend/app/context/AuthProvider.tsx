@@ -1,15 +1,7 @@
 'use client';
 
-import React, {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  useCallback,
-} from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { login as apiLogin, logout as apiLogout, AuthResponse, User, Tenant } from '../services/axios';
-
-/* ================= TIPOS ================= */
 
 export type UserRole = 'admin' | 'empresa' | 'cliente';
 
@@ -26,68 +18,45 @@ export interface EmpresaInfo {
   nif?: string;
 }
 
-/* Tenant com campos extras que o backend retorna */
-interface TenantWithExtra extends Tenant {
-  logo?: string | null;
-  email?: string;
-  nif?: string;
-}
-
-/* ================= CONTEXT ================= */
-
 export interface AuthContextType {
   user: AuthUser | null;
   empresa: EmpresaInfo | null;
   tenant: string | null;
   loading: boolean;
+  isReady: boolean;
   login: (email: string, password: string) => Promise<AuthResponse>;
   logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-/* ================= TYPE GUARDS ================= */
-
-function isValidTenant(tenant: Tenant | undefined): tenant is TenantWithExtra {
-  return !!tenant && typeof tenant.subdomain === 'string' && tenant.subdomain.length > 0;
-}
-
-function isValidUser(user: User | undefined): user is User {
-  return !!user && typeof user.id === 'string' && typeof user.name === 'string' && typeof user.role === 'string';
-}
-
-function isValidToken(token: string | undefined): token is string {
-  return typeof token === 'string' && token.length > 0;
-}
-
 /* ================= PROVIDER ================= */
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [empresa, setEmpresa] = useState<EmpresaInfo | null>(null);
   const [tenant, setTenant] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isReady, setIsReady] = useState(false);
 
   /* ================= LOGIN ================= */
   const login = useCallback(
     async (email: string, password: string): Promise<AuthResponse> => {
       setLoading(true);
-
       try {
         const data = await apiLogin(email, password);
 
-        if (!isValidUser(data.user)) throw new Error('Usuário inválido');
-        if (!isValidTenant(data.tenant)) throw new Error('Tenant inválido');
-        if (!isValidToken(data.token)) throw new Error('Token inválido');
+        if (!data.user || !data.tenant || !data.token) {
+          throw new Error("Login inválido");
+        }
 
         const authUser: AuthUser = {
           id: data.user.id,
           name: data.user.name,
           email: data.user.email,
-          role: data.user.role,
+          role: data.user.role as UserRole,
         };
 
-        const tenantExtra = data.tenant as TenantWithExtra;
+        const tenantExtra = data.tenant;
 
         const empresaInfo: EmpresaInfo = {
           logo: tenantExtra.logo ?? null,
@@ -95,17 +64,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           nif: tenantExtra.nif ?? undefined,
         };
 
-        // 🔐 ÚNICA ESCRITA NO STORAGE
+        // Salva no localStorage
         localStorage.setItem('token', data.token);
         localStorage.setItem('tenant', tenantExtra.subdomain);
         localStorage.setItem('user', JSON.stringify(authUser));
         localStorage.setItem('empresa', JSON.stringify(empresaInfo));
         localStorage.setItem('role', authUser.role);
 
-        // 🧠 STATE
+        // Atualiza estados React
         setUser(authUser);
         setTenant(tenantExtra.subdomain);
         setEmpresa(empresaInfo);
+
+        // 🔹 Redireciona para o subdomínio do tenant
+        if (window.location.hostname.startsWith('app.')) {
+          window.location.href = `http://${tenantExtra.subdomain}.app.faturaja.sdoca:3000/dashboard/Empresa`;
+        }
 
         return data;
       } finally {
@@ -118,58 +92,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   /* ================= LOGOUT ================= */
   const logout = useCallback(async (): Promise<void> => {
     setLoading(true);
-
     try {
       await apiLogout();
     } finally {
+      localStorage.clear();
       setUser(null);
-      setEmpresa(null);
       setTenant(null);
-
-      localStorage.removeItem('token');
-      localStorage.removeItem('tenant');
-      localStorage.removeItem('user');
-      localStorage.removeItem('empresa');
-      localStorage.removeItem('role');
-
+      setEmpresa(null);
       setLoading(false);
     }
   }, []);
 
-  /* ================= INIT (REHYDRATE) ================= */
+  /* ================= REHYDRATE ================= */
   useEffect(() => {
-    try {
-      const token = localStorage.getItem('token');
-      const tenantStored = localStorage.getItem('tenant');
-      const userStored = localStorage.getItem('user');
-      const empresaStored = localStorage.getItem('empresa');
-      const roleStored = localStorage.getItem('role');
+    const token = localStorage.getItem('token');
+    const tenantStored = localStorage.getItem('tenant');
+    const userStored = localStorage.getItem('user');
+    const empresaStored = localStorage.getItem('empresa');
+    const roleStored = localStorage.getItem('role');
 
-      if (!token || !tenantStored || !userStored || !roleStored) {
-        setLoading(false);
-        return;
+    if (token && tenantStored && userStored && roleStored) {
+      try {
+        const parsedUser: AuthUser = JSON.parse(userStored);
+        parsedUser.role = roleStored as UserRole;
+
+        setUser(parsedUser);
+        setTenant(tenantStored);
+        setEmpresa(empresaStored ? JSON.parse(empresaStored) : null);
+      } catch {
+        localStorage.clear();
       }
-
-      const parsedUser: AuthUser = JSON.parse(userStored);
-      parsedUser.role = roleStored as UserRole;
-
-      setUser(parsedUser);
-      setTenant(tenantStored);
-
-      if (empresaStored) {
-        const parsedEmpresa: EmpresaInfo = JSON.parse(empresaStored);
-        setEmpresa(parsedEmpresa);
-      }
-    } catch {
-      setUser(null);
-      setEmpresa(null);
-      setTenant(null);
-    } finally {
-      setLoading(false);
+    } else {
+      localStorage.clear();
     }
+
+    setLoading(false);
+    setIsReady(true);
   }, []);
 
-  /* ================= PROVIDER ================= */
   return (
     <AuthContext.Provider
       value={{
@@ -177,6 +137,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         empresa,
         tenant,
         loading,
+        isReady,
         login,
         logout,
       }}
@@ -187,7 +148,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 }
 
 /* ================= HOOK ================= */
-
 export function useAuth(): AuthContextType {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error('useAuth deve ser usado dentro do AuthProvider');

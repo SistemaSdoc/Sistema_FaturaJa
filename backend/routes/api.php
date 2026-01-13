@@ -17,15 +17,14 @@ use App\Http\Controllers\ApiTenantController;
 |--------------------------------------------------------------------------
 */
 Route::post('/login', [ApiAuthController::class, 'login']);
-Route::post('/logout', [ApiAuthController::class, 'logout'])
-    ->middleware(['tenant', 'auth:sanctum']);
 
 Route::middleware(['tenant', 'auth:sanctum', 'tenant.user'])->group(function () {
 
     Route::get('/me', [ApiAuthController::class, 'me']);
-
-    Route::get('/empresa/me', [ApiTenantController::class, 'me']);
     Route::get('/empresa/kpis', [ApiTenantController::class, 'kpis']);
+    Route::get('/empresa/vendas-categorias', [ApiTenantController::class, 'vendasCategorias']
+);
+
 
     Route::get('/pagamentos/all', [ApiPagamentoController::class, 'all'])
         ->middleware('role:admin,empresa');
@@ -48,4 +47,8 @@ Route::middleware(['tenant', 'auth:sanctum', 'tenant.user'])->group(function () 
 
     Route::apiResource('faturas/{fatura}/pagamentos', ApiPagamentoController::class)
         ->middleware('role:admin,empresa');
+    
+        
+Route::post('/logout', [ApiAuthController::class, 'logout']);
+    
 });

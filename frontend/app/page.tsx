@@ -555,7 +555,7 @@ export default function App() {
 
                         {/* Botão de Cadastro - Usa a cor Primária */}
                         <Link
-                            href="/login"
+                            href="/login" 
                             className={TAILWIND_CLASSES.buttonPrimary + " py-2 px-4 text-sm ml-4"}
                             style={{ backgroundColor: COLOR_PRIMARY, color: 'white' }}
                         >

@@ -12,25 +12,12 @@ class ApiTenantController extends Controller
     /**
      * Dados do tenant atual
      */
-    public function me(Request $request)
-    {
-        $tenant = $this->resolveTenant($request);
-        if ($tenant instanceof JsonResponse) {
-            return $tenant;
-        }
-
-        return response()->json([
-            'success' => true,
-            'tenant' => [
-                'id'        => $tenant->id,
-                'name'      => $tenant->name,
-                'subdomain' => $tenant->subdomain,
-                'email'     => $tenant->email,
-                'nif'       => $tenant->nif,
-                'logo'      => $tenant->logo,
-            ],
-        ]);
-    }
+    public function me()
+{
+    return response()->json([
+        'tenant' => tenant()
+    ]);
+}
 
     /**
      * KPIs do dashboard
